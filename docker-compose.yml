@@ -22,7 +22,7 @@ services:
       - "8100:8100"
     environment:
       DATABASE_URL: postgres://cursor_sync:cursor_sync@postgres:5432/cursor_sync
-      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-in-production}
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
       PORT: "8100"
     depends_on:
       postgres:

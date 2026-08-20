@@ -2,7 +2,14 @@ import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { pingDatabase } from "./db/pool.js";
 import { authRoutes } from "./routes/auth.js";
-import { sessionExpiry } from "./lib/session.js";
+import { assertJwtSecretConfigured, sessionExpiry } from "./lib/session.js";
+
+try {
+  assertJwtSecretConfigured();
+} catch (err) {
+  console.error(err instanceof Error ? err.message : err);
+  process.exit(1);
+}
 
 const app = new Hono();
 

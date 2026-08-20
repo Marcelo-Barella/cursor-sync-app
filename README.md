@@ -39,7 +39,7 @@ Use compose to run a throwaway Postgres plus the API on your machine. This is no
 
 ```bash
 cp .env.example .env
-# Edit JWT_SECRET in .env for anything beyond local smoke tests
+# Set JWT_SECRET in .env to a long random string (required — API refuses to start without it)
 
 docker compose up --build
 ```
@@ -104,7 +104,7 @@ See `.env.example`:
 | Variable | Description |
 |----------|-------------|
 | `DATABASE_URL` | Postgres connection string (set automatically in Compose) |
-| `JWT_SECRET` | Secret for signing session JWTs |
+| `JWT_SECRET` | Required. Secret for signing session JWTs; must not be missing or a known placeholder |
 | `PORT` | API port (default `8100`) |
 
 ### Database schema
