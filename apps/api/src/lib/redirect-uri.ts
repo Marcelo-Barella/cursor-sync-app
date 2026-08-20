@@ -1,7 +1,10 @@
 export function isAllowedRedirectUri(uri: string): boolean {
   try {
     const url = new URL(uri);
-    return url.protocol === "cursor:" && url.pathname === "/auth";
+    if (url.protocol !== "cursor:" || url.pathname !== "/auth") {
+      return false;
+    }
+    return url.hostname.toLowerCase().endsWith(".cursor-sync");
   } catch {
     return false;
   }

@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { pool } from "../db/pool.js";
 import { createLoginCode } from "../lib/login-codes.js";
-import { verifyPassword } from "../lib/password.js";
+import { verifyLoginPassword } from "../lib/password.js";
 import {
   appendCodeToRedirectUri,
   isAllowedRedirectUri,
@@ -105,12 +105,8 @@ async function verifyCredentials(
   }>(`SELECT id, email, password_hash FROM users WHERE email = $1`, [email]);
 
   const user = result.rows[0];
-  if (!user) {
-    return null;
-  }
-
-  const valid = await verifyPassword(user.password_hash, password);
-  if (!valid) {
+  const valid = await verifyLoginPassword(user?.password_hash ?? null, password);
+  if (!user || !valid) {
     return null;
   }
 
@@ -160,13 +156,16 @@ loginRoutes.post("/login", async (c) => {
       : "";
 
   if (!parsed.success) {
+    if (!redirectUri || !isAllowedRedirectUri(redirectUri)) {
+      if (wantsJson(c) || isJsonRequest) {
+        return c.json({ error: "Invalid request" }, 400);
+      }
+      return c.html(invalidRedirectHtml(), 400);
+    }
     if (wantsJson(c) || isJsonRequest) {
       return c.json({ error: "Invalid email or password" }, 400);
     }
-    if (isAllowedRedirectUri(redirectUri)) {
-      return c.html(loginFormHtml(redirectUri, "Invalid email or password"), 400);
-    }
-    return c.html(invalidRedirectHtml(), 400);
+    return c.html(loginFormHtml(redirectUri, "Invalid email or password"), 400);
   }
 
   const { email, password, redirect_uri: validRedirectUri } = parsed.data;
