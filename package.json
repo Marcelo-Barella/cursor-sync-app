@@ -1,0 +1,11 @@
+{
+  "name": "cursor-sync-app",
+  "private": true,
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:api": "npm run dev -w @cursor-sync/api",
+    "build": "npm run build -w @cursor-sync/api"
+  }
+}
