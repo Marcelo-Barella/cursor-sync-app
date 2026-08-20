@@ -10,6 +10,10 @@ export const pool = new Pool({
   connectionTimeoutMillis: DB_CONNECT_TIMEOUT_MS,
 });
 
+pool.on("error", (err) => {
+  console.error("postgres pool idle client error:", err.message);
+});
+
 export async function pingDatabase(): Promise<void> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
