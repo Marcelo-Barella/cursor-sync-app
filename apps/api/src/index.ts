@@ -2,6 +2,7 @@ import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { pingDatabase } from "./db/pool.js";
 import { authRoutes } from "./routes/auth.js";
+import { configsRoutes } from "./routes/configs.js";
 import { loginRoutes } from "./routes/login.js";
 import { assertJwtSecretConfigured, sessionExpiry } from "./lib/session.js";
 
@@ -24,6 +25,7 @@ app.get("/health", async (c) => {
 });
 
 app.route("/auth", authRoutes);
+app.route("/configs", configsRoutes);
 app.route("/", loginRoutes);
 
 const port = Number(process.env.PORT ?? 8100);
