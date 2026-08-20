@@ -4,6 +4,19 @@ Cursor Sync website, auth API, and Postgres (sync.bergamota.dev).
 
 Monorepo for the Cursor Sync backend and (future) website. This slice provides email/password auth via a TypeScript API backed by Postgres 16.
 
+## Environments
+
+| Environment | Postgres | API | Who runs it |
+|-------------|----------|-----|-------------|
+| **Local dev** | Postgres 16 in `docker-compose.yml` (this repo) | `localhost:8100` via compose port map | You |
+| **Lab** | Separate docker-internal Postgres on marcelo-1 | DevOps (Tailscale, e.g. `http://100.78.40.83:8100`) | DevOps |
+
+**Local compose is for development only.** The Postgres container in this repo is not the lab or production database.
+
+**Lab database** is a separate Postgres instance that DevOps operates on marcelo-1. This repo does not deploy, bind, or publish Postgres there — and must not add a second Postgres on marcelo-1. Do not run migrations or deploy to marcelo-1 from this repo yet.
+
+In local compose, **port 8100 is the API only** (`api:8100` mapped to the host). Postgres stays on the Docker Compose network with **no host port** (5432 is not published).
+
 ## Structure
 
 ```
@@ -14,9 +27,9 @@ db/
   init/    Postgres schema applied on first container boot
 ```
 
-## Local development (Docker Compose only)
+## Local development (Docker Compose)
 
-This setup is for local development. It does not deploy to marcelo-1 or any remote host.
+Use compose to run a throwaway Postgres plus the API on your machine. This is not wired to the lab stack on marcelo-1.
 
 ### Prerequisites
 
@@ -31,7 +44,7 @@ cp .env.example .env
 docker compose up --build
 ```
 
-The API listens on **http://localhost:8100**. Postgres runs inside the Docker network only (port 5432 is not published to the host).
+The API listens on **http://localhost:8100** (host map to `api:8100`). The compose Postgres service is reachable only as `postgres:5432` inside the compose network — it is not exposed on the host.
 
 ### Endpoints
 
@@ -83,7 +96,7 @@ See `.env.example`:
 
 ### Database schema
 
-Schema is initialized from `db/init/001_schema.sql` on first Postgres boot via `docker-entrypoint-initdb.d`.
+The locked DBA schema lives in `db/init/001_schema.sql`. In local dev it is applied automatically on first boot of the **compose** Postgres container via `docker-entrypoint-initdb.d`. DevOps applies the same schema to the lab database on marcelo-1 separately — not from this repo.
 
 #### Master password cache-bust (future)
 
@@ -101,9 +114,6 @@ WHERE id = $2;
 
 - Cursor extension URI callback (`cursor://MarceloBarella.cursor-sync/auth`)
 - Website UI (`apps/web` is a stub)
-- Remote deploy, migrations on production, Supabase, Cloudflare Workers, R2
+- Deploy or migrate to marcelo-1 (lab DB and API are DevOps-owned)
+- Supabase, Cloudflare Workers, R2
 - Set/change master password endpoints
-
-## Planned production URL
-
-Tailscale: `http://100.78.40.83:8100` — not wired up in this PR.
