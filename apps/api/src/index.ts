@@ -1,6 +1,6 @@
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
-import { pool } from "./db/pool.js";
+import { pingDatabase } from "./db/pool.js";
 import { authRoutes } from "./routes/auth.js";
 import { sessionExpiry } from "./lib/session.js";
 
@@ -8,7 +8,7 @@ const app = new Hono();
 
 app.get("/health", async (c) => {
   try {
-    await pool.query("SELECT 1");
+    await pingDatabase();
     return c.json({ status: "ok" });
   } catch {
     return c.json({ status: "error" }, 503);
