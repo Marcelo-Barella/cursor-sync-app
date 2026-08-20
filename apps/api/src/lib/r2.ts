@@ -1,33 +1,21 @@
 export type R2Config = {
   accountId: string;
   bucket: string;
-  parentAccessKeyId: string;
-  parentSecretAccessKey: string;
   apiToken: string;
 };
 
 export function getR2Config(): R2Config | null {
   const accountId = process.env.CLOUDFLARE_ACCOUNT_ID?.trim();
   const bucket = process.env.R2_BUCKET?.trim();
-  const parentAccessKeyId = process.env.R2_PARENT_ACCESS_KEY_ID?.trim();
-  const parentSecretAccessKey = process.env.R2_PARENT_SECRET_ACCESS_KEY?.trim();
   const apiToken = process.env.CLOUDFLARE_API_TOKEN?.trim();
 
-  if (
-    !accountId ||
-    !bucket ||
-    !parentAccessKeyId ||
-    !parentSecretAccessKey ||
-    !apiToken
-  ) {
+  if (!accountId || !bucket || !apiToken) {
     return null;
   }
 
   return {
     accountId,
     bucket,
-    parentAccessKeyId,
-    parentSecretAccessKey,
     apiToken,
   };
 }
@@ -69,7 +57,6 @@ export async function mintTempCredentials(
     },
     body: JSON.stringify({
       bucket: config.bucket,
-      parentAccessKeyId: config.parentAccessKeyId,
       permission: "object-read-write",
       ttlSeconds,
       prefixes: [prefix],

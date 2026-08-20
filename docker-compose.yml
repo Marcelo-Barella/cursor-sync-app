@@ -26,9 +26,7 @@ services:
       PORT: "8100"
       CLOUDFLARE_ACCOUNT_ID: ${CLOUDFLARE_ACCOUNT_ID:-}
       CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN:-}
-      R2_BUCKET: ${R2_BUCKET:-}
-      R2_PARENT_ACCESS_KEY_ID: ${R2_PARENT_ACCESS_KEY_ID:-}
-      R2_PARENT_SECRET_ACCESS_KEY: ${R2_PARENT_SECRET_ACCESS_KEY:-}
+      R2_BUCKET: ${R2_BUCKET:-cursor-sync-lab}
     depends_on:
       postgres:
         condition: service_healthy
