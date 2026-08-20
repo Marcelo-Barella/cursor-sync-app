@@ -55,7 +55,20 @@ The API listens on **http://localhost:8100** (host map to `api:8100`). The compo
 | POST | `/auth/login` | `{ "email", "password" }` → `{ "token" }` |
 | GET | `/auth/me` | `Authorization: Bearer <token>` → `{ "id", "email", "secrets_version" }` |
 
-Passwords are hashed with **argon2id** and never returned. The `master_password` column exists for future trusted-server encryption but is not exposed or set in this slice.
+### Crypto model (locked)
+
+Two fields, two algorithms — do not add a third path:
+
+| Column | Purpose | At rest | Returned by API |
+|--------|---------|---------|-----------------|
+| `users.password_hash` | Login password | **argon2id** (one-way hash) | Never |
+| `users.master_password` | Sync master password | **AES-256-GCM ciphertext** (`bytea`) | Never raw; future endpoint decrypts server-side so the extension can store plaintext in SecretStorage |
+
+- `master_password` is **not** a one-way hash. It must remain recoverable: encrypt on write, decrypt on read.
+- Do **not** put `master_password` on `configs`. Do **not** hash it with argon2 or any other KDF.
+- This slice leaves `master_password` **NULL** and omits set/change endpoints.
+
+Login passwords use argon2id only (`apps/api/src/lib/password.ts`). AES-256-GCM for `master_password` will be implemented in a later slice.
 
 ### Session model
 
@@ -100,11 +113,11 @@ The locked DBA schema lives in `db/init/001_schema.sql`. In local dev it is appl
 
 #### Master password cache-bust (future)
 
-When master password is set or rotated, bump `secrets_version` in the same transaction so clients know cached secrets are stale:
+When master password is set or rotated, store **AES-256-GCM ciphertext** in `master_password` (not a hash) and bump `secrets_version` in the same transaction:
 
 ```sql
 UPDATE users
-SET master_password = $1,
+SET master_password = $1,  -- AES-256-GCM ciphertext (bytea)
     secrets_version = secrets_version + 1,
     updated_at = now()
 WHERE id = $2;
