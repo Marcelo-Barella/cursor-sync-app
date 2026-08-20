@@ -3,7 +3,9 @@ import { z } from "zod";
 import { pool } from "../db/pool.js";
 import { requireAuth, type AuthVariables } from "../middleware/auth.js";
 
-const payloadSchema = z.record(z.unknown());
+const putBodySchema = z.object({
+  payload: z.record(z.unknown()),
+});
 
 export const configsRoutes = new Hono<{ Variables: AuthVariables }>();
 
@@ -36,7 +38,7 @@ configsRoutes.put("/", requireAuth, async (c) => {
   const userId = c.get("userId");
 
   const body = await c.req.json().catch(() => null);
-  const parsed = payloadSchema.safeParse(body);
+  const parsed = putBodySchema.safeParse(body);
   if (!parsed.success) {
     return c.json({ error: "Invalid payload" }, 400);
   }
@@ -50,7 +52,7 @@ configsRoutes.put("/", requireAuth, async (c) => {
      ON CONFLICT (user_id) DO UPDATE
      SET payload = EXCLUDED.payload, updated_at = now()
      RETURNING payload, updated_at`,
-    [userId, parsed.data]
+    [userId, parsed.data.payload]
   );
 
   const row = result.rows[0];
