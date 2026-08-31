@@ -19,3 +19,14 @@ export function readToken(): string | null {
 export function clearToken(): void {
   sessionStorage.removeItem(TOKEN_STORAGE_KEY);
 }
+
+export const HANDOFF_ATTEMPTED_KEY = "cursor_sync_handoff_attempted";
+
+export function attemptExtensionHandoff(token: string): void {
+  sessionStorage.setItem(HANDOFF_ATTEMPTED_KEY, String(Date.now()));
+  window.location.href = buildExtensionAuthUrl(token);
+}
+
+export function wasHandoffAttempted(): boolean {
+  return sessionStorage.getItem(HANDOFF_ATTEMPTED_KEY) !== null;
+}

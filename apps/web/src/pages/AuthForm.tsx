@@ -2,31 +2,40 @@ import { FormEvent, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { signIn, signUp } from "../lib/api";
 import { saveToken } from "../lib/auth";
+import { AuthLayout } from "../components/AuthLayout";
 import { Button } from "../components/Button";
 import { Input } from "../components/Input";
-import { Mark } from "../components/Mark";
 
 type AuthFormProps = {
   mode: "sign-in" | "sign-up";
 };
 
+const SIGN_IN_ERROR = "Email or password is wrong";
+const SIGN_UP_EMAIL_ERROR = "That email is already in use";
+
 export function AuthForm({ mode }: AuthFormProps) {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [errorField, setErrorField] = useState<"email" | "password" | null>(null);
   const [loading, setLoading] = useState(false);
 
   const isSignUp = mode === "sign-up";
-  const title = isSignUp ? "Create your account" : "Sign in";
-  const submitLabel = isSignUp ? "Create account" : "Sign in";
-  const alternatePath = isSignUp ? "/sign-in" : "/sign-up";
-  const alternatePrompt = isSignUp ? "Already have an account?" : "New to Cursor Sync?";
-  const alternateLabel = isSignUp ? "Sign in" : "Create an account";
+  const page = isSignUp ? "sign-up" : "sign-in";
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
+    setErrorField(null);
+
+    if (isSignUp && password !== confirmPassword) {
+      setError("Passwords do not match");
+      setErrorField("password");
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -34,80 +43,89 @@ export function AuthForm({ mode }: AuthFormProps) {
         ? await signUp(email.trim(), password)
         : await signIn(email.trim(), password);
       saveToken(auth.token);
-      navigate("/auth/callback", { replace: true });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      navigate("/auth/continue", { replace: true });
+    } catch {
+      if (isSignUp) {
+        setError(SIGN_UP_EMAIL_ERROR);
+        setErrorField("email");
+      } else {
+        setError(SIGN_IN_ERROR);
+        setErrorField("password");
+      }
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className="page">
-      <main className="page-main page-main--narrow">
-        <div className="stack-xl">
-          <Link to="/" aria-label="Back to home">
-            <Mark size="md" />
-          </Link>
+    <AuthLayout page={page}>
+      <div className="auth-card-header">
+        <h1 className="auth-card-title">{isSignUp ? "Create an account" : "Sign in"}</h1>
+        <p className="auth-card-sub">Opened from the Cursor Sync extension.</p>
+      </div>
 
-          <div className="auth-card stack-lg">
-            <div className="stack">
-              <h1 className="title">{title}</h1>
-              <p className="muted">
-                {isSignUp
-                  ? "Create an account to connect the Cursor Sync extension."
-                  : "Sign in to connect the Cursor Sync extension."}
-              </p>
-            </div>
+      <form className="auth-form" onSubmit={handleSubmit} noValidate>
+        <Input
+          label="Email"
+          type="email"
+          name="email"
+          autoComplete="email"
+          placeholder="you@example.com"
+          value={email}
+          onChange={(event) => setEmail(event.target.value)}
+          error={errorField === "email" ? error ?? undefined : undefined}
+          disabled={loading}
+          required
+        />
+        <Input
+          label="Password"
+          type="password"
+          name="password"
+          autoComplete={isSignUp ? "new-password" : "current-password"}
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
+          error={errorField === "password" ? error ?? undefined : undefined}
+          disabled={loading}
+          minLength={8}
+          required
+        />
+        {isSignUp ? (
+          <Input
+            label="Confirm password"
+            type="password"
+            name="confirmPassword"
+            autoComplete="new-password"
+            value={confirmPassword}
+            onChange={(event) => setConfirmPassword(event.target.value)}
+            disabled={loading}
+            minLength={8}
+            required
+          />
+        ) : null}
+        <Button type="submit" variant="primary" fullWidth loading={loading}>
+          {loading
+            ? isSignUp
+              ? "Creating account…"
+              : "Signing in…"
+            : "Continue in Cursor"}
+        </Button>
+      </form>
 
-            {loading ? (
-              <div className="loading-state" role="status" aria-live="polite">
-                <div className="spinner" aria-hidden="true" />
-                <p className="muted">{isSignUp ? "Creating account…" : "Signing in…"}</p>
-              </div>
-            ) : (
-              <form className="stack-lg" onSubmit={handleSubmit} noValidate>
-                <Input
-                  label="Email"
-                  type="email"
-                  name="email"
-                  autoComplete="email"
-                  placeholder="email@domain.com"
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                  required
-                />
-                <Input
-                  label="Password"
-                  type="password"
-                  name="password"
-                  autoComplete={isSignUp ? "new-password" : "current-password"}
-                  placeholder="At least 8 characters"
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  minLength={8}
-                  required
-                />
-                {error ? (
-                  <p className="error-text" role="alert">
-                    {error}
-                  </p>
-                ) : null}
-                <Button type="submit" variant="primary" fullWidth>
-                  {submitLabel}
-                </Button>
-              </form>
-            )}
-
-            <p className="form-footer muted">
-              {alternatePrompt}{" "}
-              <Link to={alternatePath} className="link-muted">
-                {alternateLabel}
-              </Link>
-            </p>
-          </div>
-        </div>
-      </main>
-    </div>
+      <p className="auth-form-footer">
+        {isSignUp ? (
+          <>
+            <Link to="/sign-in" className="auth-link">
+              Sign in
+            </Link>
+          </>
+        ) : (
+          <>
+            <Link to="/sign-up" className="auth-link">
+              Create an account
+            </Link>
+          </>
+        )}
+      </p>
+    </AuthLayout>
   );
 }

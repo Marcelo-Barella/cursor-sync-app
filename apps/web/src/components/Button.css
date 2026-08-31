@@ -43,3 +43,23 @@
 .btn--ghost:hover:not(:disabled) {
   border-color: var(--color-muted);
 }
+
+.btn--loading {
+  gap: var(--space-1);
+}
+
+.btn-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid color-mix(in srgb, var(--color-ground) 30%, transparent);
+  border-top-color: var(--color-ground);
+  border-radius: 50%;
+  animation: btn-spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes btn-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
