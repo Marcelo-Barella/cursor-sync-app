@@ -28,5 +28,14 @@ services:
       postgres:
         condition: service_healthy
 
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    ports:
+      - "3000:80"
+    depends_on:
+      - api
+
 volumes:
   postgres_data:

@@ -6,6 +6,8 @@
   ],
   "scripts": {
     "dev:api": "npm run dev -w @cursor-sync/api",
-    "build": "npm run build -w @cursor-sync/api"
+    "dev:web": "npm run dev -w @cursor-sync/web",
+    "build": "npm run build -w @cursor-sync/api && npm run build -w @cursor-sync/web",
+    "test": "npm run test -w @cursor-sync/web"
   }
 }

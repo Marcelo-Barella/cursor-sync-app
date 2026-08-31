@@ -1,5 +1,6 @@
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
+import { cors } from "hono/cors";
 import { pingDatabase } from "./db/pool.js";
 import { authRoutes } from "./routes/auth.js";
 import { assertJwtSecretConfigured, sessionExpiry } from "./lib/session.js";
@@ -12,6 +13,15 @@ try {
 }
 
 const app = new Hono();
+
+app.use(
+  "*",
+  cors({
+    origin: (origin) => origin ?? "*",
+    allowMethods: ["GET", "POST", "OPTIONS"],
+    allowHeaders: ["Content-Type", "Authorization"],
+  })
+);
 
 app.get("/health", async (c) => {
   try {
