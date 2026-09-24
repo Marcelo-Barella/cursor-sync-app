@@ -3,6 +3,9 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { pingDatabase } from "./db/pool.js";
 import { authRoutes } from "./routes/auth.js";
+import { configsRoutes } from "./routes/configs.js";
+import { loginRoutes } from "./routes/login.js";
+import { storageRoutes } from "./routes/storage.js";
 import { assertJwtSecretConfigured, sessionExpiry } from "./lib/session.js";
 
 try {
@@ -33,6 +36,9 @@ app.get("/health", async (c) => {
 });
 
 app.route("/auth", authRoutes);
+app.route("/configs", configsRoutes);
+app.route("/v1/storage", storageRoutes);
+app.route("/", loginRoutes);
 
 const port = Number(process.env.PORT ?? 8100);
 
