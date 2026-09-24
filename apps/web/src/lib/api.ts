@@ -6,7 +6,7 @@ export type AuthError = {
   error: string;
 };
 
-const API_BASE = import.meta.env.VITE_API_URL ?? "";
+import { getApiBaseUrl } from "./apiBase";
 
 async function parseJson<T>(response: Response): Promise<T> {
   const data = await response.json().catch(() => null);
@@ -21,7 +21,7 @@ async function parseJson<T>(response: Response): Promise<T> {
 }
 
 export async function signUp(email: string, password: string): Promise<AuthResponse> {
-  const response = await fetch(`${API_BASE}/auth/signup`, {
+  const response = await fetch(`${getApiBaseUrl()}/auth/signup`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, password }),
@@ -30,7 +30,7 @@ export async function signUp(email: string, password: string): Promise<AuthRespo
 }
 
 export async function signIn(email: string, password: string): Promise<AuthResponse> {
-  const response = await fetch(`${API_BASE}/auth/login`, {
+  const response = await fetch(`${getApiBaseUrl()}/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, password }),
@@ -39,7 +39,7 @@ export async function signIn(email: string, password: string): Promise<AuthRespo
 }
 
 export async function getMe(token: string): Promise<{ id: string; email: string }> {
-  const response = await fetch(`${API_BASE}/auth/me`, {
+  const response = await fetch(`${getApiBaseUrl()}/auth/me`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   return parseJson(response);

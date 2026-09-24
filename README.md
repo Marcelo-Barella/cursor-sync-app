@@ -15,7 +15,7 @@ Monorepo for the Cursor Sync backend and public website. Email/password auth via
 
 **Lab database** is a separate Postgres instance that DevOps operates on marcelo-1. This repo does not deploy, bind, or publish Postgres there — and must not add a second Postgres on marcelo-1. Do not run migrations or deploy to marcelo-1 from this repo yet.
 
-In local compose, **port 8100 is the API** and **port 3000 is the website** (nginx serving the built SPA, proxying `/auth` to the API). Postgres stays on the Docker Compose network with **no host port** (5432 is not published).
+In local compose, **port 8100 is the API** and **port 3000 is the website** (nginx serving the built SPA). The SPA calls the API by absolute URL (`VITE_API_URL`, defaulting to `http://localhost:8100` in compose). Postgres stays on the Docker Compose network with **no host port** (5432 is not published).
 
 ## Structure
 
@@ -46,11 +46,12 @@ docker compose up --build
 With the API running (compose or `npm run dev:api`):
 
 ```bash
+cp .env.example .env   # includes VITE_API_URL=http://localhost:8100 for the website
 npm install
 npm run dev:web
 ```
 
-Vite proxies `/auth` and `/health` to `http://localhost:8100`.
+The website calls the API at `VITE_API_URL` (see `.env.example`). For a one-off override in the browser, open **Developer** in the footer or use `?api=<url>` on any page.
 
 ### Endpoints
 
@@ -69,6 +70,7 @@ Vite proxies `/auth` and `/health` to `http://localhost:8100`.
 | `/sign-in` | Email/password sign in |
 | `/sign-up` | Email/password sign up |
 | `/auth/callback` | Post-auth handoff to `cursor://MarceloBarella.cursor-sync/auth` |
+| `/developer` | API target override (localStorage; no auth gate) |
 
 The website authenticates only. Syncing happens in the Cursor extension — the site never syncs machines.
 
@@ -131,6 +133,7 @@ See `.env.example`:
 | `DATABASE_URL` | Postgres connection string (set automatically in Compose) |
 | `JWT_SECRET` | Required. Secret for signing session JWTs; must not be missing or a known placeholder |
 | `PORT` | API port (default `8100`) |
+| `VITE_API_URL` | Website: API origin baked into the Vite build (e.g. `http://localhost:8100` locally). When unset at build time, the site defaults to `https://api.sync.bergamota.dev`. Runtime overrides: footer **Developer** panel or `?api=<url>` (stored in `localStorage`). |
 
 ### Database schema
 
