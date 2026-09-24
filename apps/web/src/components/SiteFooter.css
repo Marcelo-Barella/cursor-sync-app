@@ -1,0 +1,64 @@
+.site-footer {
+  border-top: 1px solid var(--color-line);
+  background: var(--color-surface);
+}
+
+.site-footer-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  max-width: var(--max-content);
+  margin: 0 auto;
+  padding: var(--space-3);
+  min-height: 64px;
+}
+
+.site-footer-start,
+.site-footer-end {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.site-footer-brand {
+  font-family: var(--font-display);
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.site-footer-domain,
+.site-footer-api,
+.site-footer-developer {
+  font-size: 0.8125rem;
+  color: var(--color-muted);
+}
+
+.site-footer-developer {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--color-line);
+}
+
+.site-footer-developer:hover {
+  color: var(--color-ink);
+  text-decoration-color: var(--color-muted);
+}
+
+.site-footer-api {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.75rem;
+  max-width: min(100%, 420px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .site-footer-end {
+    width: 100%;
+    justify-content: space-between;
+  }
+}

@@ -1,15 +1,15 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
-const apiTarget = process.env.VITE_API_PROXY_TARGET ?? "http://localhost:8100";
+const webRoot = path.dirname(fileURLToPath(import.meta.url));
+const repoRoot = path.resolve(webRoot, "../..");
 
 export default defineConfig({
+  envDir: repoRoot,
   plugins: [react()],
   server: {
     port: 3000,
-    proxy: {
-      "/auth": { target: apiTarget, changeOrigin: true },
-      "/health": { target: apiTarget, changeOrigin: true },
-    },
   },
 });

@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Mark } from "../components/Mark";
+import { SiteFooter } from "../components/SiteFooter";
 import "./LandingPage.css";
 
 function FeatureIcon({ name }: { name: "travel" | "sync" | "signin" }) {
@@ -144,12 +145,7 @@ export function LandingPage() {
         </section>
       </main>
 
-      <footer className="landing-footer">
-        <div className="landing-footer-inner">
-          <span className="landing-footer-brand">Cursor Sync</span>
-          <span className="landing-footer-domain">sync.bergamota.dev</span>
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
   );
 }
