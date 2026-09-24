@@ -9,6 +9,7 @@ Monorepo for the Cursor Sync backend and public website. Email/password auth via
 | Environment | Postgres | API | Website | Who runs it |
 |-------------|----------|-----|---------|-------------|
 | **Local dev** | Postgres 16 in `docker-compose.yml` (this repo) | `localhost:8100` via compose port map | `localhost:3000` (Vite dev or compose) | You |
+| **Staging** | DevOps / VPS (not compose Postgres) | `https://api-staging.sync.bergamota.dev` | `https://staging.sync.bergamota.dev` | DevOps |
 | **Lab** | Separate docker-internal Postgres on marcelo-1 | DevOps (Tailscale, e.g. `http://100.78.40.83:8100`) | DevOps | DevOps |
 
 **Local compose is for development only.** The Postgres container in this repo is not the lab or production database.
@@ -53,6 +54,14 @@ npm run dev:web
 
 The website calls the API at `VITE_API_URL` (see `.env.example`). For a one-off override in the browser, open **Developer** in the footer or use `?api=<url>` on any page.
 
+**Staging website build** (API default via env file, production resolver fallback unchanged):
+
+```bash
+npm run build:staging -w @cursor-sync/web
+```
+
+Uses `apps/web/.env.staging` (`VITE_API_URL=https://api-staging.sync.bergamota.dev`). Deploy the `dist/` output to `https://staging.sync.bergamota.dev` with `apps/web/vercel.json` SPA rewrites so `/sign-in`, `/auth/callback`, and `/developer` work on hard refresh.
+
 ### Endpoints
 
 | Method | Path | Description |
@@ -60,6 +69,8 @@ The website calls the API at `VITE_API_URL` (see `.env.example`). For a one-off 
 | GET | `/health` | Liveness + DB connectivity |
 | POST | `/auth/signup` | `{ "email", "password" }` → `{ "token" }` |
 | POST | `/auth/login` | `{ "email", "password" }` → `{ "token" }` |
+| POST | `/auth/token` | `{ "code" }` → `{ "token" }` (one-time login code from extension flow) |
+| POST | `/login/code` | `Authorization: Bearer <token>`, `{ "redirect_uri", "state"? }` → `{ "code", "redirect_uri", "state"? }` |
 | GET | `/auth/me` | `Authorization: Bearer <token>` → `{ "id", "email", "secrets_version" }` |
 
 ### Website routes
@@ -76,11 +87,13 @@ The website authenticates only. Syncing happens in the Cursor extension — the 
 
 ### Extension callback
 
-After sign-in or sign-up, the site redirects to `/auth/callback` with a JWT in session storage. The user clicks **Return to Cursor** or **Continue in Cursor** to open:
+The extension opens `/sign-in?redirect_uri=…&state=…`. After sign-in, the site requests a one-time code from `POST /login/code` and redirects to the extension URI with `code` and `state` (never a JWT in the URL):
 
 ```
-cursor://MarceloBarella.cursor-sync/auth?token=<jwt>
+cursor://MarceloBarella.cursor-sync/auth?code=<one-time-code>&state=<state>
 ```
+
+The extension exchanges the code at `POST /auth/token` for a session JWT.
 
 ### Crypto model (locked)
 
@@ -133,6 +146,7 @@ See `.env.example`:
 | `DATABASE_URL` | Postgres connection string (set automatically in Compose) |
 | `JWT_SECRET` | Required. Secret for signing session JWTs; must not be missing or a known placeholder |
 | `PORT` | API port (default `8100`) |
+| `CORS_ALLOWED_ORIGINS` | Optional comma-separated browser origins (e.g. `https://staging.sync.bergamota.dev`). When unset, the API reflects the request `Origin` header (or `*` when absent). |
 | `VITE_API_URL` | Website: API origin baked into the Vite build (e.g. `http://localhost:8100` locally). When unset at build time, the site defaults to `https://api.sync.bergamota.dev`. Runtime overrides: footer **Developer** panel or `?api=<url>` (stored in `localStorage`). |
 
 ### Database schema

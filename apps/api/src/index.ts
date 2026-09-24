@@ -6,6 +6,7 @@ import { authRoutes } from "./routes/auth.js";
 import { configsRoutes } from "./routes/configs.js";
 import { loginRoutes } from "./routes/login.js";
 import { storageRoutes } from "./routes/storage.js";
+import { resolveCorsOrigin } from "./lib/cors.js";
 import { assertJwtSecretConfigured, sessionExpiry } from "./lib/session.js";
 
 try {
@@ -20,7 +21,7 @@ const app = new Hono();
 app.use(
   "*",
   cors({
-    origin: (origin) => origin ?? "*",
+    origin: (origin) => resolveCorsOrigin(origin),
     allowMethods: ["GET", "POST", "OPTIONS"],
     allowHeaders: ["Content-Type", "Authorization"],
   })
