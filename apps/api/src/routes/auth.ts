@@ -1,7 +1,8 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { pool } from "../db/pool.js";
-import { hashPassword, verifyPassword } from "../lib/password.js";
+import { hashPassword, verifyLoginPassword } from "../lib/password.js";
+import { exchangeLoginCode } from "../lib/login-codes.js";
 import { createSessionToken } from "../lib/session.js";
 import { requireAuth, type AuthVariables } from "../middleware/auth.js";
 
@@ -79,16 +80,28 @@ authRoutes.post("/login", async (c) => {
   );
 
   const user = result.rows[0];
-  if (!user) {
-    return c.json({ error: "Invalid email or password" }, 401);
-  }
-
-  const valid = await verifyPassword(user.password_hash, password);
-  if (!valid) {
+  const valid = await verifyLoginPassword(user?.password_hash ?? null, password);
+  if (!user || !valid) {
     return c.json({ error: "Invalid email or password" }, 401);
   }
 
   const token = createSessionToken(user.id, user.email);
+  return c.json({ token });
+});
+
+authRoutes.post("/token", async (c) => {
+  const body = await c.req.json().catch(() => null);
+  const parsed = z.object({ code: z.string().min(1) }).safeParse(body);
+  if (!parsed.success) {
+    return c.json({ error: "Invalid request" }, 400);
+  }
+
+  const user = await exchangeLoginCode(parsed.data.code);
+  if (!user) {
+    return c.json({ error: "Invalid request" }, 400);
+  }
+
+  const token = createSessionToken(user.userId, user.email);
   return c.json({ token });
 });
 
