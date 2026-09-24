@@ -7,11 +7,18 @@ import {
   appendCodeToRedirectUri,
   isAllowedRedirectUri,
 } from "../lib/redirect-uri.js";
+import { requireAuth, type AuthVariables } from "../middleware/auth.js";
 
 const loginInputSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
   redirect_uri: z.string().min(1),
+  state: z.string().optional(),
+});
+
+const issueLoginCodeSchema = z.object({
+  redirect_uri: z.string().min(1),
+  state: z.string().optional(),
 });
 
 function escapeHtml(value: string): string {
@@ -122,7 +129,28 @@ function wantsJson(c: { req: { header: (name: string) => string | undefined } })
   return accept.includes("application/json") && !accept.includes("text/html");
 }
 
-export const loginRoutes = new Hono();
+export const loginRoutes = new Hono<{ Variables: AuthVariables }>();
+
+loginRoutes.post("/login/code", requireAuth, async (c) => {
+  const body = await c.req.json().catch(() => null);
+  const parsed = issueLoginCodeSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ error: "Invalid request" }, 400);
+  }
+
+  const { redirect_uri, state } = parsed.data;
+  if (!isAllowedRedirectUri(redirect_uri)) {
+    return c.json({ error: "Invalid request" }, 400);
+  }
+
+  const userId = c.get("userId");
+  const code = await createLoginCode(userId);
+  return c.json({
+    code,
+    redirect_uri,
+    ...(state !== undefined ? { state } : {}),
+  });
+});
 
 loginRoutes.get("/login", (c) => {
   const redirectUri = c.req.query("redirect_uri") ?? "";
@@ -168,7 +196,12 @@ loginRoutes.post("/login", async (c) => {
     return c.html(loginFormHtml(redirectUri, "Invalid email or password"), 400);
   }
 
-  const { email, password, redirect_uri: validRedirectUri } = parsed.data;
+  const {
+    email,
+    password,
+    redirect_uri: validRedirectUri,
+    state,
+  } = parsed.data;
   if (!isAllowedRedirectUri(validRedirectUri)) {
     if (wantsJson(c) || isJsonRequest) {
       return c.json({ error: "Invalid request" }, 400);
@@ -188,10 +221,14 @@ loginRoutes.post("/login", async (c) => {
   }
 
   const code = await createLoginCode(user.id);
-  const redirectWithCode = appendCodeToRedirectUri(validRedirectUri, code);
+  const redirectWithCode = appendCodeToRedirectUri(validRedirectUri, code, state);
 
   if (wantsJson(c) || isJsonRequest) {
-    return c.json({ code, redirect_uri: redirectWithCode });
+    return c.json({
+      code,
+      redirect_uri: redirectWithCode,
+      ...(state !== undefined ? { state } : {}),
+    });
   }
 
   return c.redirect(buildSuccessRedirect(code, validRedirectUri), 302);

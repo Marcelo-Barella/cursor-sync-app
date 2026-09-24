@@ -44,3 +44,32 @@ export async function getMe(token: string): Promise<{ id: string; email: string 
   });
   return parseJson(response);
 }
+
+export type LoginCodeResponse = {
+  code: string;
+  redirect_uri: string;
+  state?: string;
+};
+
+export async function issueLoginCode(
+  token: string,
+  redirectUri: string,
+  state?: string | null
+): Promise<LoginCodeResponse> {
+  const body: { redirect_uri: string; state?: string } = {
+    redirect_uri: redirectUri,
+  };
+  if (state != null && state !== "") {
+    body.state = state;
+  }
+
+  const response = await fetch(`${getApiBaseUrl()}/login/code`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(body),
+  });
+  return parseJson<LoginCodeResponse>(response);
+}

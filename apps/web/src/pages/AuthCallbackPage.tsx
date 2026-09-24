@@ -1,22 +1,36 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
-import { getMe } from "../lib/api";
+import { Link, useSearchParams } from "react-router-dom";
+import { getMe, issueLoginCode } from "../lib/api";
 import {
   attemptExtensionHandoff,
+  authPathWithOAuthQuery,
   clearToken,
+  readOAuthRedirectUri,
+  readOAuthState,
   readToken,
+  resolveOAuthRedirectUri,
+  saveOAuthParams,
 } from "../lib/auth";
 import { AuthLayout } from "../components/AuthLayout";
 import { Button } from "../components/Button";
 
-type CallbackView = "loading" | "return" | "missed" | "empty" | "error";
+type CallbackView = "loading" | "return" | "missed" | "empty" | "error" | "invalid-link";
 
 const HANDOFF_TIMEOUT_MS = 2500;
 
 export function AuthCallbackPage() {
+  const [searchParams] = useSearchParams();
   const [view, setView] = useState<CallbackView>("loading");
   const [token, setToken] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
   const handoffTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const queryRedirectUri = searchParams.get("redirect_uri");
+  const queryState = searchParams.get("state");
+  const redirectUri = resolveOAuthRedirectUri(queryRedirectUri);
+  const oauthState = queryState ?? readOAuthState();
+
+  const signInPath = authPathWithOAuthQuery("/sign-in", redirectUri, oauthState);
 
   const clearHandoffTimer = useCallback(() => {
     if (handoffTimer.current) {
@@ -25,20 +39,53 @@ export function AuthCallbackPage() {
     }
   }, []);
 
-  const tryHandoff = useCallback(
-    (sessionToken: string, onMissed?: () => void) => {
-      attemptExtensionHandoff(sessionToken);
-      clearHandoffTimer();
-      handoffTimer.current = setTimeout(() => {
-        if (!document.hidden) {
-          onMissed?.();
-        }
-      }, HANDOFF_TIMEOUT_MS);
+  const issueAndHandoff = useCallback(
+    async (sessionToken: string, onMissed?: () => void) => {
+      const targetRedirectUri =
+        redirectUri ?? resolveOAuthRedirectUri(queryRedirectUri) ?? readOAuthRedirectUri();
+      const targetState = oauthState ?? readOAuthState();
+
+      if (!targetRedirectUri) {
+        setView("invalid-link");
+        return;
+      }
+
+      setBusy(true);
+      try {
+        const issued = await issueLoginCode(
+          sessionToken,
+          targetRedirectUri,
+          targetState
+        );
+        attemptExtensionHandoff(
+          targetRedirectUri,
+          issued.code,
+          issued.state ?? targetState
+        );
+        clearHandoffTimer();
+        handoffTimer.current = setTimeout(() => {
+          if (!document.hidden) {
+            onMissed?.();
+          }
+        }, HANDOFF_TIMEOUT_MS);
+      } catch {
+        setView("error");
+      } finally {
+        setBusy(false);
+      }
     },
-    [clearHandoffTimer]
+    [redirectUri, queryRedirectUri, oauthState, clearHandoffTimer]
   );
 
   useEffect(() => {
+    if (queryRedirectUri && !redirectUri) {
+      setView("invalid-link");
+      return;
+    }
+    if (redirectUri) {
+      saveOAuthParams(redirectUri, oauthState);
+    }
+
     const sessionToken = readToken();
     if (!sessionToken) {
       setView("empty");
@@ -48,6 +95,10 @@ export function AuthCallbackPage() {
     getMe(sessionToken)
       .then(() => {
         setToken(sessionToken);
+        if (!redirectUri && !readOAuthRedirectUri()) {
+          setView("invalid-link");
+          return;
+        }
         setView("return");
       })
       .catch(() => {
@@ -56,16 +107,16 @@ export function AuthCallbackPage() {
       });
 
     return clearHandoffTimer;
-  }, [clearHandoffTimer]);
+  }, [queryRedirectUri, redirectUri, oauthState, clearHandoffTimer]);
 
   function handleReturnToCursor() {
     if (!token) return;
-    tryHandoff(token, () => setView("missed"));
+    void issueAndHandoff(token, () => setView("missed"));
   }
 
   function handleTryAgain() {
     if (!token) return;
-    tryHandoff(token);
+    void issueAndHandoff(token);
   }
 
   if (view === "loading") {
@@ -78,6 +129,19 @@ export function AuthCallbackPage() {
     );
   }
 
+  if (view === "invalid-link") {
+    return (
+      <AuthLayout page="callback" showMarkInCard>
+        <div className="auth-card-header">
+          <h1 className="auth-card-title">Return to Cursor</h1>
+          <p className="auth-card-sub">
+            Open sign-in from the Cursor Sync extension to connect.
+          </p>
+        </div>
+      </AuthLayout>
+    );
+  }
+
   if (view === "empty") {
     return (
       <AuthLayout page="callback" showMarkInCard>
@@ -85,7 +149,7 @@ export function AuthCallbackPage() {
           <h1 className="auth-card-title">Return to Cursor</h1>
           <p className="auth-card-sub">Sign in first to connect the extension.</p>
         </div>
-        <Link to="/sign-in">
+        <Link to={signInPath}>
           <Button variant="primary" fullWidth>
             Sign in
           </Button>
@@ -101,7 +165,7 @@ export function AuthCallbackPage() {
           <h1 className="auth-card-title">Return to Cursor</h1>
           <p className="auth-card-sub">Your session could not be verified.</p>
         </div>
-        <Link to="/sign-in">
+        <Link to={signInPath}>
           <Button variant="primary" fullWidth>
             Sign in again
           </Button>
@@ -120,7 +184,7 @@ export function AuthCallbackPage() {
             can close.
           </p>
         </div>
-        <Button variant="ghost" fullWidth onClick={handleTryAgain}>
+        <Button variant="ghost" fullWidth loading={busy} onClick={handleTryAgain}>
           Try again
         </Button>
       </AuthLayout>
@@ -134,7 +198,12 @@ export function AuthCallbackPage() {
         <p className="auth-card-body">This tab can close.</p>
       </div>
       <div className="auth-card-actions">
-        <Button variant="primary" fullWidth onClick={handleReturnToCursor}>
+        <Button
+          variant="primary"
+          fullWidth
+          loading={busy}
+          onClick={handleReturnToCursor}
+        >
           Return to Cursor
         </Button>
         <p className="auth-card-helper">
