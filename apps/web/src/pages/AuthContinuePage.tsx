@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { getMe, issueLoginCode } from "../lib/api";
 import {
-  attemptExtensionHandoff,
   authPathWithOAuthQuery,
   clearToken,
   readOAuthRedirectUri,
@@ -13,6 +12,7 @@ import {
   resolveOAuthRedirectUriForHandoff,
   saveOAuthParams,
 } from "../lib/auth";
+import { savePendingLoginCode } from "../lib/loginHandoff";
 import { AuthLayout } from "../components/AuthLayout";
 import { Button } from "../components/Button";
 
@@ -61,7 +61,7 @@ export function AuthContinuePage() {
 
   const callbackPath = authPathWithOAuthQuery("/auth/callback", redirectUri, oauthState);
 
-  const performHandoff = useCallback(async () => {
+  const issueCodeAndGoToCallback = useCallback(async () => {
     const sessionToken = token ?? readToken();
     const targetRedirectUri =
       resolveOAuthRedirectUriForHandoff(queryRedirectUri) ??
@@ -82,11 +82,7 @@ export function AuthContinuePage() {
         targetRedirectUri,
         targetState
       );
-      attemptExtensionHandoff(
-        targetRedirectUri,
-        issued.code,
-        issued.state ?? targetState
-      );
+      savePendingLoginCode(issued.code);
       navigate(callbackPath, { replace: true });
     } catch {
       setHandoffError("Could not issue a sign-in code. Try again.");
@@ -100,8 +96,8 @@ export function AuthContinuePage() {
       return;
     }
     handoffStarted.current = true;
-    void performHandoff();
-  }, [state, busy, performHandoff]);
+    void issueCodeAndGoToCallback();
+  }, [state, busy, issueCodeAndGoToCallback]);
 
   const signInPath = authPathWithOAuthQuery("/sign-in", redirectUri, oauthState);
 
@@ -165,7 +161,7 @@ export function AuthContinuePage() {
       <div className="auth-card-header">
         <h1 className="auth-card-title">Continue in Cursor</h1>
         <p className="auth-card-body">
-          You&apos;re signed in. Return to Cursor to finish.
+          You&apos;re signed in. Preparing your login code…
         </p>
       </div>
       <div className="auth-card-actions">
@@ -174,7 +170,7 @@ export function AuthContinuePage() {
           fullWidth
           loading={busy}
           onClick={() => {
-            void performHandoff();
+            void issueCodeAndGoToCallback();
           }}
         >
           Continue in Cursor
@@ -184,7 +180,6 @@ export function AuthContinuePage() {
             {handoffError}
           </p>
         ) : null}
-        <p className="auth-card-helper">You can safely close this window.</p>
       </div>
     </AuthLayout>
   );
