@@ -4,7 +4,6 @@ import { getMe, issueLoginCode, resendVerificationEmail } from "../lib/api";
 import {
   authPathWithOAuthQuery,
   clearToken,
-  readOAuthRedirectUri,
   readOAuthState,
   readOAuthStateFromSearchParams,
   readRedirectUriFromSearchParams,
@@ -16,7 +15,7 @@ import { savePendingLoginCode } from "../lib/loginHandoff";
 import { AuthLayout } from "../components/AuthLayout";
 import { Button } from "../components/Button";
 
-type ContinueState = "loading" | "ready" | "empty" | "error" | "invalid-link";
+type ContinueState = "loading" | "ready" | "empty" | "error";
 
 export function AuthContinuePage() {
   const navigate = useNavigate();
@@ -50,11 +49,6 @@ export function AuthContinuePage() {
       .then((me) => {
         setToken(sessionToken);
         setEmailVerified(me.emailVerified !== false);
-        const handoffTarget = resolveOAuthRedirectUriForHandoff(queryRedirectUri);
-        if (!handoffTarget) {
-          setState("invalid-link");
-          return;
-        }
         setState("ready");
       })
       .catch(() => {
@@ -67,12 +61,9 @@ export function AuthContinuePage() {
 
   const issueCodeAndGoToCallback = useCallback(async () => {
     const sessionToken = token ?? readToken();
-    const targetRedirectUri =
-      resolveOAuthRedirectUriForHandoff(queryRedirectUri) ??
-      readOAuthRedirectUri();
     const targetState = oauthState ?? readOAuthState();
 
-    if (!sessionToken || !targetRedirectUri) {
+    if (!sessionToken) {
       setHandoffError("Missing session or redirect information.");
       return;
     }
@@ -81,11 +72,7 @@ export function AuthContinuePage() {
     setHandoffError(null);
 
     try {
-      const issued = await issueLoginCode(
-        sessionToken,
-        targetRedirectUri,
-        targetState
-      );
+      const issued = await issueLoginCode(sessionToken, redirectUri, targetState);
       savePendingLoginCode(issued.code);
       navigate(callbackPath, { replace: true });
     } catch {
@@ -93,7 +80,7 @@ export function AuthContinuePage() {
     } finally {
       setBusy(false);
     }
-  }, [token, queryRedirectUri, oauthState, navigate, callbackPath]);
+  }, [token, redirectUri, oauthState, navigate, callbackPath]);
 
   useEffect(() => {
     if (state !== "ready" || busy || handoffStarted.current) {
@@ -136,19 +123,6 @@ export function AuthContinuePage() {
       <AuthLayout page="continue" showMarkInCard>
         <div className="auth-loading-state" role="status" aria-live="polite">
           <div className="spinner" />
-        </div>
-      </AuthLayout>
-    );
-  }
-
-  if (state === "invalid-link") {
-    return (
-      <AuthLayout page="continue" showMarkInCard>
-        <div className="auth-card-header">
-          <h1 className="auth-card-title">Continue in Cursor</h1>
-          <p className="auth-card-sub">
-            Open sign-in from the Cursor Sync extension to continue.
-          </p>
         </div>
       </AuthLayout>
     );

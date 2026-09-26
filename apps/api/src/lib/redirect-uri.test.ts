@@ -1,10 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import {
-  appendCodeToRedirectUri,
-  buildAuthCallbackRedirect,
-  isAllowedRedirectUri,
-} from "./redirect-uri.js";
+import { buildAuthCallbackRedirect, isAllowedRedirectUri } from "./redirect-uri.js";
 
 describe("isAllowedRedirectUri", () => {
   it("accepts cursor and vscode extension auth URIs (case-insensitive authority)", () => {
@@ -39,14 +35,5 @@ describe("buildAuthCallbackRedirect", () => {
     );
     assert.match(uri, /code=a%2Bb%2Fc/);
     assert.match(uri, /state=opaque/);
-  });
-
-  it("matches appendCodeToRedirectUri behavior", () => {
-    const code = "test-code";
-    const base = "vscode://MarceloBarella.cursor-sync/auth";
-    assert.equal(
-      appendCodeToRedirectUri(base, code, "s1"),
-      buildAuthCallbackRedirect(base, code, "s1")
-    );
   });
 });

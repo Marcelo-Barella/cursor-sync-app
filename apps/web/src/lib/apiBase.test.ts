@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { DEFAULT_STAGING_API_BASE_URL } from "./defaults";
 import {
   API_BASE_STORAGE_KEY,
-  STAGING_API_BASE_URL,
   normalizeApiBaseUrl,
   readQueryApiOverride,
   resolveApiBaseUrl,
@@ -69,7 +69,7 @@ describe("resolveApiBaseUrl", () => {
     const storage = createMemoryStorage();
     expect(
       resolveApiBaseUrl({ storage, search: "", buildTimeUrl: "", mode: "staging" })
-    ).toBe(STAGING_API_BASE_URL);
+    ).toBe(DEFAULT_STAGING_API_BASE_URL);
   });
 
   it("never returns an empty string as a usable auth API base in production-like modes", () => {
