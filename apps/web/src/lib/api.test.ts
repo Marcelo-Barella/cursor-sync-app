@@ -1,19 +1,21 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getMe, signIn, signUp } from "./api";
 import { AuthApiError } from "./authErrors";
-import { getApiBaseUrl } from "./apiBase";
+import { getApiBaseUrlForAuth, isAuthApiBaseMissing } from "./apiBase";
 
 vi.mock("./apiBase", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./apiBase")>();
   return {
     ...actual,
-    getApiBaseUrl: vi.fn(actual.getApiBaseUrl),
+    getApiBaseUrlForAuth: vi.fn(actual.getApiBaseUrlForAuth),
+    isAuthApiBaseMissing: vi.fn(actual.isAuthApiBaseMissing),
   };
 });
 
 describe("api auth", () => {
   beforeEach(() => {
-    vi.mocked(getApiBaseUrl).mockReturnValue("https://api.example.com");
+    vi.mocked(isAuthApiBaseMissing).mockReturnValue(false);
+    vi.mocked(getApiBaseUrlForAuth).mockReturnValue("https://api.example.com");
   });
 
   afterEach(() => {
@@ -29,15 +31,18 @@ describe("api auth", () => {
 
     const result = await signUp("user@example.com", "password123");
     expect(result.token).toBe("test-token");
-    expect(fetchMock).toHaveBeenCalledWith("https://api.example.com/auth/signup", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: "user@example.com", password: "password123" }),
-    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.example.com/auth/signup",
+      expect.objectContaining({
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: "user@example.com", password: "password123" }),
+      })
+    );
   });
 
   it("signIn uses the resolved API base", async () => {
-    vi.mocked(getApiBaseUrl).mockReturnValue("http://localhost:8100");
+    vi.mocked(getApiBaseUrlForAuth).mockReturnValue("http://localhost:8100");
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({ token: "tok" }),
@@ -81,7 +86,7 @@ describe("api auth", () => {
     );
   });
 
-  it("signIn maps 404 responses to not found", async () => {
+  it("signIn maps 404 responses to unavailable", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue({
@@ -92,7 +97,7 @@ describe("api auth", () => {
     );
 
     await expect(signIn("user@example.com", "password123")).rejects.toEqual(
-      expect.objectContaining({ category: "not_found" })
+      expect.objectContaining({ category: "unavailable" })
     );
   });
 
@@ -119,13 +124,14 @@ describe("api auth", () => {
     );
   });
 
-  it("rejects an empty API base before calling fetch", async () => {
-    vi.mocked(getApiBaseUrl).mockReturnValue("");
+  it("rejects a missing API base before calling fetch", async () => {
+    vi.mocked(isAuthApiBaseMissing).mockReturnValue(true);
+    vi.mocked(getApiBaseUrlForAuth).mockReturnValue(null);
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(signIn("user@example.com", "password123")).rejects.toEqual(
-      expect.objectContaining({ category: "misconfigured" })
+      expect.objectContaining({ category: "empty_api_base" })
     );
     expect(fetchMock).not.toHaveBeenCalled();
   });

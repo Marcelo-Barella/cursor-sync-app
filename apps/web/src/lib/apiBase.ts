@@ -3,6 +3,7 @@ import {
   DEFAULT_PRODUCTION_API_BASE_URL,
   DEFAULT_STAGING_API_BASE_URL,
 } from "./defaults";
+import { messageForAuthErrorCategory } from "./authErrors";
 
 export const API_BASE_STORAGE_KEY = "cursor-sync-api-base-url";
 export const DEFAULT_API_BASE_URL = DEFAULT_PRODUCTION_API_BASE_URL;
@@ -15,10 +16,10 @@ export function defaultApiBaseForMode(mode: string = import.meta.env.MODE): stri
   if (mode === "staging") {
     return STAGING_API_BASE_URL;
   }
-  if (mode === "production") {
-    return DEFAULT_API_BASE_URL;
+  if (mode === "development") {
+    return LOCAL_API_PRESET;
   }
-  return LOCAL_API_PRESET;
+  return "";
 }
 
 export function normalizeApiBaseUrl(raw: string): string | null {
@@ -70,12 +71,19 @@ export type ResolveApiBaseOptions = {
   mode?: string;
 };
 
-function readBuildTimeUrl(explicit?: string): string | undefined {
+export function readBuildTimeApiUrl(explicit?: string): string | undefined {
   const raw = explicit ?? import.meta.env.VITE_API_URL;
   if (typeof raw !== "string" || !raw.trim()) {
     return undefined;
   }
   return raw;
+}
+
+export function isBuildTimeApiBaseConfigured(options?: {
+  buildTimeUrl?: string;
+}): boolean {
+  const raw = readBuildTimeApiUrl(options?.buildTimeUrl);
+  return raw !== undefined && normalizeApiBaseUrl(raw) !== null;
 }
 
 export function resolveApiBaseUrl(options: ResolveApiBaseOptions = {}): string {
@@ -107,7 +115,7 @@ export function resolveApiBaseUrl(options: ResolveApiBaseOptions = {}): string {
     }
   }
 
-  const buildTimeRaw = readBuildTimeUrl(options.buildTimeUrl);
+  const buildTimeRaw = readBuildTimeApiUrl(options.buildTimeUrl);
   if (buildTimeRaw) {
     const normalized = normalizeApiBaseUrl(buildTimeRaw);
     if (normalized) {
@@ -120,27 +128,32 @@ export function resolveApiBaseUrl(options: ResolveApiBaseOptions = {}): string {
 
 export function getApiBaseUrl(): string {
   const resolved = resolveApiBaseUrl();
-  const normalized =
-    normalizeApiBaseUrl(resolved) ?? defaultApiBaseForMode(import.meta.env.MODE);
-  if (!normalized) {
-    return defaultApiBaseForMode(import.meta.env.MODE);
+  const normalized = normalizeApiBaseUrl(resolved);
+  if (normalized) {
+    return normalized;
   }
-  return normalized;
+  const fallback = defaultApiBaseForMode(import.meta.env.MODE);
+  return fallback;
 }
 
-export function getApiBaseConfigurationError(): string | null {
-  const base = getApiBaseUrl();
-  if (!base.trim()) {
-    return messageForEmptyApiBase();
-  }
-  if (!normalizeApiBaseUrl(base)) {
-    return messageForEmptyApiBase();
+export function getApiBaseUrlForAuth(): string | null {
+  const resolved = resolveApiBaseUrl();
+  const normalized = normalizeApiBaseUrl(resolved);
+  if (normalized) {
+    return normalized;
   }
   return null;
 }
 
-function messageForEmptyApiBase(): string {
-  return "API base URL is not configured. Set VITE_API_URL when building the site, or set an API override on the Developer page.";
+export function isAuthApiBaseMissing(): boolean {
+  return getApiBaseUrlForAuth() === null;
+}
+
+export function getApiBaseConfigurationError(): string | null {
+  if (isAuthApiBaseMissing()) {
+    return messageForAuthErrorCategory("empty_api_base");
+  }
+  return null;
 }
 
 export function isProductionLikeMode(mode: string = import.meta.env.MODE): boolean {

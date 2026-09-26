@@ -1,12 +1,17 @@
 export type AuthErrorCategory =
   | "network"
-  | "misconfigured"
-  | "not_found"
+  | "timeout"
+  | "unavailable"
   | "server"
+  | "empty_api_base"
   | "email_taken"
   | "invalid_credentials"
-  | "validation"
+  | "validation_email"
+  | "validation_password"
+  | "rate_limit"
   | "unknown";
+
+export type AuthPrimaryAction = "continue" | "try_again" | "return_to_cursor";
 
 export class AuthApiError extends Error {
   readonly category: AuthErrorCategory;
@@ -23,58 +28,101 @@ export class AuthApiError extends Error {
 export function messageForAuthErrorCategory(category: AuthErrorCategory): string {
   switch (category) {
     case "network":
-      return "Network is unavailable. Check your connection and try again.";
-    case "misconfigured":
-      return "The API is unreachable or misconfigured. Set VITE_API_URL at build time or use the Developer panel.";
-    case "not_found":
-      return "The API endpoint was not found. The site may be pointing at the wrong API host.";
+      return "Can’t reach Cursor Sync. Check your connection and try again.";
+    case "timeout":
+      return "That took too long. Try again.";
+    case "unavailable":
+      return "Sign-in isn’t available right now. Try again in a bit.";
     case "server":
-      return "The server returned an error. Try again in a moment.";
+      return "Something went wrong on our side. Try again.";
+    case "empty_api_base":
+      return "Sign-in isn’t set up in this build. Open Cursor Sync from the extension.";
     case "email_taken":
-      return "That email is already registered. Sign in or use a different email.";
+      return "That email is already in use.";
     case "invalid_credentials":
-      return "Wrong email or password.";
-    case "validation":
-      return "Enter a valid email and a password of at least 8 characters.";
+      return "Email or password is wrong.";
+    case "validation_email":
+      return "Enter a valid email.";
+    case "validation_password":
+      return "Use a stronger password.";
+    case "rate_limit":
+      return "Too many tries. Wait a minute and try again.";
     case "unknown":
-      return "Something went wrong. Try again.";
+      return "Sign-in isn’t available right now. Try again in a bit.";
+  }
+}
+
+export function mutedHelperForAuthErrorCategory(
+  category: AuthErrorCategory
+): string | null {
+  if (category === "network" || category === "timeout") {
+    return "Your details weren’t sent.";
+  }
+  return null;
+}
+
+export function primaryActionForAuthErrorCategory(
+  category: AuthErrorCategory
+): AuthPrimaryAction {
+  switch (category) {
+    case "email_taken":
+    case "invalid_credentials":
+    case "validation_email":
+    case "validation_password":
+      return "continue";
+    case "empty_api_base":
+      return "return_to_cursor";
+    case "network":
+    case "timeout":
+    case "unavailable":
+    case "server":
+    case "rate_limit":
+    case "unknown":
+      return "try_again";
   }
 }
 
 export type AuthFormErrorField = "email" | "password" | null;
 
 export function fieldForAuthErrorCategory(
-  category: AuthErrorCategory,
-  mode: "sign-in" | "sign-up"
+  category: AuthErrorCategory
 ): AuthFormErrorField {
   switch (category) {
     case "email_taken":
+    case "validation_email":
       return "email";
     case "invalid_credentials":
+    case "validation_password":
       return "password";
-    case "validation":
-      return mode === "sign-up" ? "email" : "password";
-    case "misconfigured":
-    case "network":
-    case "not_found":
-    case "server":
-    case "unknown":
+    default:
       return null;
   }
 }
 
-export function mapAuthApiError(
-  error: unknown,
-  mode: "sign-in" | "sign-up"
-): { message: string; field: AuthFormErrorField } {
+export type MappedAuthFormError = {
+  message: string;
+  field: AuthFormErrorField;
+  category: AuthErrorCategory;
+  primaryAction: AuthPrimaryAction;
+  mutedHelper: string | null;
+};
+
+export function mapAuthApiError(error: unknown): MappedAuthFormError {
   if (error instanceof AuthApiError) {
     return {
       message: error.message,
-      field: fieldForAuthErrorCategory(error.category, mode),
+      field: fieldForAuthErrorCategory(error.category),
+      category: error.category,
+      primaryAction: primaryActionForAuthErrorCategory(error.category),
+      mutedHelper: mutedHelperForAuthErrorCategory(error.category),
     };
   }
+  const category: AuthErrorCategory = "unavailable";
   return {
-    message: messageForAuthErrorCategory("unknown"),
+    message: messageForAuthErrorCategory(category),
     field: null,
+    category,
+    primaryAction: primaryActionForAuthErrorCategory(category),
+    mutedHelper: null,
   };
 }
