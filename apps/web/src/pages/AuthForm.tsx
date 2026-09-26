@@ -1,5 +1,5 @@
-import { FormEvent, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { FormEvent, useEffect, useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { signIn, signUp } from "../lib/api";
 import { isAuthApiBaseMissing } from "../lib/apiBase";
 import {
@@ -8,7 +8,16 @@ import {
   messageForAuthErrorCategory,
   type MappedAuthFormError,
 } from "../lib/authErrors";
-import { EXTENSION_AUTH_URI, saveToken } from "../lib/auth";
+import {
+  authPathWithOAuthQuery,
+  EXTENSION_AUTH_URI,
+  readOAuthState,
+  readOAuthStateFromSearchParams,
+  readRedirectUriFromSearchParams,
+  resolveOAuthRedirectUri,
+  saveOAuthParams,
+  saveToken,
+} from "../lib/auth";
 import { AuthLayout } from "../components/AuthLayout";
 import { Button } from "../components/Button";
 import { Input } from "../components/Input";
@@ -28,6 +37,7 @@ function emptyApiBaseFormError(): MappedAuthFormError {
 
 export function AuthForm({ mode }: AuthFormProps) {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -35,9 +45,41 @@ export function AuthForm({ mode }: AuthFormProps) {
     isAuthApiBaseMissing() ? emptyApiBaseFormError() : null
   );
   const [loading, setLoading] = useState(false);
+  const [oauthError, setOauthError] = useState<string | null>(null);
+
+  const rawRedirectQuery =
+    searchParams.get("redirect_uri") ??
+    searchParams.get("redirectUri") ??
+    searchParams.get("redirect");
+  const queryState = readOAuthStateFromSearchParams(searchParams);
+  const redirectUri = resolveOAuthRedirectUri(rawRedirectQuery);
+  const oauthState = queryState ?? readOAuthState();
+
+  useEffect(() => {
+    if (rawRedirectQuery?.trim() && !redirectUri) {
+      setOauthError(
+        "This sign-in link is not valid. Open sign-in from the Cursor Sync extension."
+      );
+      return;
+    }
+    setOauthError(null);
+    if (redirectUri) {
+      saveOAuthParams(redirectUri, oauthState);
+    }
+  }, [rawRedirectQuery, redirectUri, oauthState]);
 
   const isSignUp = mode === "sign-up";
   const page = isSignUp ? "sign-up" : "sign-in";
+  const alternatePath = authPathWithOAuthQuery(
+    isSignUp ? "/sign-in" : "/sign-up",
+    redirectUri,
+    oauthState
+  );
+  const continuePath = authPathWithOAuthQuery(
+    "/auth/continue",
+    redirectUri,
+    oauthState
+  );
 
   const apiBaseMissing = formError?.category === "empty_api_base";
   const primaryAction = formError?.primaryAction ?? "continue";
@@ -47,14 +89,14 @@ export function AuthForm({ mode }: AuthFormProps) {
     formError && formError.field === null ? formError.message : null;
 
   function handleReturnToCursor() {
-    window.location.href = EXTENSION_AUTH_URI;
+    window.location.href = redirectUri ?? EXTENSION_AUTH_URI;
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setFormError(null);
 
-    if (apiBaseMissing) {
+    if (oauthError || apiBaseMissing) {
       return;
     }
 
@@ -81,7 +123,10 @@ export function AuthForm({ mode }: AuthFormProps) {
         ? await signUp(email.trim(), password)
         : await signIn(email.trim(), password);
       saveToken(auth.token);
-      navigate("/auth/continue", { replace: true });
+      if (redirectUri) {
+        saveOAuthParams(redirectUri, oauthState);
+      }
+      navigate(continuePath, { replace: true });
     } catch (caught) {
       setFormError(mapAuthApiError(caught));
     } finally {
@@ -89,13 +134,25 @@ export function AuthForm({ mode }: AuthFormProps) {
     }
   }
 
-  const submitLabel = loading
-    ? isSignUp
-      ? "Creating account…"
-      : "Signing in…"
-    : primaryAction === "try_again"
-      ? "Try again"
-      : "Continue in Cursor";
+  if (oauthError) {
+    return (
+      <AuthLayout page={page}>
+        <div className="auth-card-header">
+          <h1 className="auth-card-title">{isSignUp ? "Create an account" : "Sign in"}</h1>
+          <p className="auth-card-sub">{oauthError}</p>
+        </div>
+      </AuthLayout>
+    );
+  }
+
+  const submitLabel =
+    loading
+      ? isSignUp
+        ? "Creating account…"
+        : "Signing in…"
+      : primaryAction === "try_again"
+        ? "Try again"
+        : "Continue in Cursor";
 
   return (
     <AuthLayout page={page}>
@@ -168,11 +225,11 @@ export function AuthForm({ mode }: AuthFormProps) {
 
       <p className="auth-form-footer">
         {isSignUp ? (
-          <Link to="/sign-in" className="auth-link">
+          <Link to={alternatePath} className="auth-link">
             Sign in
           </Link>
         ) : (
-          <Link to="/sign-up" className="auth-link">
+          <Link to={alternatePath} className="auth-link">
             Create an account
           </Link>
         )}
