@@ -4,6 +4,9 @@ import {
   EXTENSION_AUTH_URI,
   HANDOFF_ATTEMPTED_KEY,
   isAllowedExtensionRedirectUri,
+  normalizeExtensionRedirectUri,
+  resolveOAuthRedirectUri,
+  resolveOAuthRedirectUriForHandoff,
 } from "./auth";
 
 describe("isAllowedExtensionRedirectUri", () => {
@@ -15,6 +18,9 @@ describe("isAllowedExtensionRedirectUri", () => {
     expect(
       isAllowedExtensionRedirectUri("cursor://marcelobarella.cursor-sync/auth")
     ).toBe(true);
+    expect(
+      isAllowedExtensionRedirectUri("cursor://MarceloBarella.cursor-sync/auth/")
+    ).toBe(true);
   });
 
   it("rejects other schemes, hosts, and paths", () => {
@@ -24,6 +30,29 @@ describe("isAllowedExtensionRedirectUri", () => {
     );
     expect(isAllowedExtensionRedirectUri("cursor://MarceloBarella.cursor-sync/other")).toBe(
       false
+    );
+  });
+});
+
+describe("normalizeExtensionRedirectUri", () => {
+  it("canonicalizes allowed URIs", () => {
+    expect(
+      normalizeExtensionRedirectUri("cursor://MarceloBarella.cursor-sync/auth/")
+    ).toBe("cursor://marcelobarella.cursor-sync/auth");
+  });
+});
+
+describe("resolveOAuthRedirectUriForHandoff", () => {
+  it("falls back to the default extension URI when query and storage are empty", () => {
+    expect(resolveOAuthRedirectUriForHandoff(null)).toBe(
+      "cursor://marcelobarella.cursor-sync/auth"
+    );
+  });
+
+  it("prefers a valid query redirect over the default", () => {
+    const vscodeUri = "vscode://MarceloBarella.cursor-sync/auth";
+    expect(resolveOAuthRedirectUri(vscodeUri)).toBe(
+      "vscode://marcelobarella.cursor-sync/auth"
     );
   });
 });

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   API_BASE_STORAGE_KEY,
-  DEFAULT_API_BASE_URL,
+  STAGING_API_BASE_URL,
   normalizeApiBaseUrl,
   readQueryApiOverride,
   resolveApiBaseUrl,
@@ -53,11 +53,41 @@ describe("normalizeApiBaseUrl", () => {
 });
 
 describe("resolveApiBaseUrl", () => {
-  it("uses the production default when nothing else is set", () => {
+  it("does not invent a production API host when build-time URL is missing", () => {
+    const storage = createMemoryStorage();
+    const url = resolveApiBaseUrl({
+      storage,
+      search: "",
+      buildTimeUrl: "",
+      mode: "production",
+    });
+    expect(url).toBe("");
+    expect(normalizeApiBaseUrl(url)).toBeNull();
+  });
+
+  it("uses the staging default when nothing else is set in staging mode", () => {
     const storage = createMemoryStorage();
     expect(
-      resolveApiBaseUrl({ storage, search: "", buildTimeUrl: "" })
-    ).toBe(DEFAULT_API_BASE_URL);
+      resolveApiBaseUrl({ storage, search: "", buildTimeUrl: "", mode: "staging" })
+    ).toBe(STAGING_API_BASE_URL);
+  });
+
+  it("never returns an empty string as a usable auth API base in production-like modes", () => {
+    const storage = createMemoryStorage();
+    for (const mode of ["production", "staging"] as const) {
+      const url = resolveApiBaseUrl({
+        storage,
+        search: "",
+        buildTimeUrl: mode === "production" ? "" : "https://api-staging.example.com",
+        mode,
+      });
+      const authBase = normalizeApiBaseUrl(url);
+      if (mode === "production" && !url) {
+        expect(authBase).toBeNull();
+      } else {
+        expect(authBase).not.toBeNull();
+      }
+    }
   });
 
   it("uses VITE_API_URL when provided at build time", () => {
@@ -114,6 +144,7 @@ describe("resolveApiBaseUrl", () => {
         storage,
         search: "?api=clear",
         buildTimeUrl: "http://localhost:8100",
+        mode: "development",
       })
     ).toBe("http://localhost:8100");
     expect(storage.getItem(API_BASE_STORAGE_KEY)).toBeNull();

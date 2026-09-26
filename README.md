@@ -9,7 +9,7 @@ Monorepo for the Cursor Sync backend and public website. Email/password auth via
 | Environment | Postgres | API | Website | Who runs it |
 |-------------|----------|-----|---------|-------------|
 | **Local dev** | Postgres 16 in `docker-compose.yml` (this repo) | `localhost:8100` via compose port map | `localhost:3000` (Vite dev or compose) | You |
-| **Staging** | DevOps / VPS (not compose Postgres) | `https://api-staging.sync.bergamota.dev` | `https://staging.sync.bergamota.dev` | DevOps |
+| **Staging** | DevOps / VPS (not compose Postgres) | `https://api-staging-sync.bergamota.dev` | `https://staging.sync.bergamota.dev` | DevOps |
 | **Lab** | Separate docker-internal Postgres on marcelo-1 | DevOps (Tailscale, e.g. `http://100.78.40.83:8100`) | DevOps | DevOps |
 
 **Local compose is for development only.** The Postgres container in this repo is not the lab or production database.
@@ -60,7 +60,7 @@ The website calls the API at `VITE_API_URL` (see `.env.example`). For a one-off 
 npm run build:staging -w @cursor-sync/web
 ```
 
-Uses `apps/web/.env.staging` (`VITE_API_URL=https://api-staging.sync.bergamota.dev`). Deploy the `dist/` output to `https://staging.sync.bergamota.dev` with `apps/web/vercel.json` SPA rewrites so `/sign-in`, `/auth/callback`, and `/developer` work on hard refresh.
+Uses `apps/web/.env.staging` (`VITE_API_URL=https://api-staging-sync.bergamota.dev`). Deploy the `dist/` output to `https://staging.sync.bergamota.dev` with `apps/web/vercel.json` SPA rewrites so `/sign-in`, `/auth/callback`, and `/developer` work on hard refresh.
 
 ### Endpoints
 

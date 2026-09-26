@@ -16,6 +16,10 @@ describe("isAllowedRedirectUri", () => {
       isAllowedRedirectUri("vscode://marcelobarella.cursor-sync/auth"),
       true
     );
+    assert.equal(
+      isAllowedRedirectUri("cursor://MarceloBarella.cursor-sync/auth/"),
+      true
+    );
   });
 
   it("rejects invalid redirect URIs with 400-worthy inputs", () => {
