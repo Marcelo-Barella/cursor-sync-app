@@ -1,23 +1,17 @@
 import {
   DEFAULT_LOCAL_API_BASE_URL,
-  DEFAULT_PRODUCTION_API_BASE_URL,
   DEFAULT_STAGING_API_BASE_URL,
 } from "./defaults";
-import { messageForAuthErrorCategory } from "./authErrors";
 
 export const API_BASE_STORAGE_KEY = "cursor-sync-api-base-url";
-export const DEFAULT_API_BASE_URL = DEFAULT_PRODUCTION_API_BASE_URL;
-export const STAGING_API_BASE_URL = DEFAULT_STAGING_API_BASE_URL;
-export const LOCAL_API_PRESET = DEFAULT_LOCAL_API_BASE_URL;
-
 export const API_BASE_CHANGED_EVENT = "cursor-sync-api-base-changed";
 
 export function defaultApiBaseForMode(mode: string = import.meta.env.MODE): string {
   if (mode === "staging") {
-    return STAGING_API_BASE_URL;
+    return DEFAULT_STAGING_API_BASE_URL;
   }
   if (mode === "development") {
-    return LOCAL_API_PRESET;
+    return DEFAULT_LOCAL_API_BASE_URL;
   }
   return "";
 }
@@ -79,13 +73,6 @@ export function readBuildTimeApiUrl(explicit?: string): string | undefined {
   return raw;
 }
 
-export function isBuildTimeApiBaseConfigured(options?: {
-  buildTimeUrl?: string;
-}): boolean {
-  const raw = readBuildTimeApiUrl(options?.buildTimeUrl);
-  return raw !== undefined && normalizeApiBaseUrl(raw) !== null;
-}
-
 export function resolveApiBaseUrl(options: ResolveApiBaseOptions = {}): string {
   const mode = options.mode ?? import.meta.env.MODE;
   const storage =
@@ -126,38 +113,20 @@ export function resolveApiBaseUrl(options: ResolveApiBaseOptions = {}): string {
   return defaultApiBaseForMode(mode);
 }
 
+function normalizedResolvedApiBase(): string | null {
+  return normalizeApiBaseUrl(resolveApiBaseUrl());
+}
+
 export function getApiBaseUrl(): string {
-  const resolved = resolveApiBaseUrl();
-  const normalized = normalizeApiBaseUrl(resolved);
-  if (normalized) {
-    return normalized;
-  }
-  const fallback = defaultApiBaseForMode(import.meta.env.MODE);
-  return fallback;
+  return normalizedResolvedApiBase() ?? defaultApiBaseForMode(import.meta.env.MODE);
 }
 
 export function getApiBaseUrlForAuth(): string | null {
-  const resolved = resolveApiBaseUrl();
-  const normalized = normalizeApiBaseUrl(resolved);
-  if (normalized) {
-    return normalized;
-  }
-  return null;
+  return normalizedResolvedApiBase();
 }
 
 export function isAuthApiBaseMissing(): boolean {
   return getApiBaseUrlForAuth() === null;
-}
-
-export function getApiBaseConfigurationError(): string | null {
-  if (isAuthApiBaseMissing()) {
-    return messageForAuthErrorCategory("empty_api_base");
-  }
-  return null;
-}
-
-export function isProductionLikeMode(mode: string = import.meta.env.MODE): boolean {
-  return mode === "production" || mode === "staging";
 }
 
 export function getStoredApiOverride(

@@ -4,7 +4,7 @@ import { pool } from "../db/pool.js";
 import { createLoginCode } from "../lib/login-codes.js";
 import { verifyLoginPassword } from "../lib/password.js";
 import {
-  appendCodeToRedirectUri,
+  buildAuthCallbackRedirect,
   isAllowedRedirectUri,
 } from "../lib/redirect-uri.js";
 import { requireAuth, type AuthVariables } from "../middleware/auth.js";
@@ -166,7 +166,7 @@ loginRoutes.get("/login/success", (c) => {
   if (!code || !isAllowedRedirectUri(redirectUri)) {
     return c.html(invalidRedirectHtml(), 400);
   }
-  const redirectWithCode = appendCodeToRedirectUri(redirectUri, code);
+  const redirectWithCode = buildAuthCallbackRedirect(redirectUri, code);
   return c.html(loginSuccessHtml(redirectWithCode, code));
 });
 
@@ -221,7 +221,7 @@ loginRoutes.post("/login", async (c) => {
   }
 
   const code = await createLoginCode(user.id);
-  const redirectWithCode = appendCodeToRedirectUri(validRedirectUri, code, state);
+  const redirectWithCode = buildAuthCallbackRedirect(validRedirectUri, code, state);
 
   if (wantsJson(c) || isJsonRequest) {
     return c.json({

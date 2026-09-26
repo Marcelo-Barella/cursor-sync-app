@@ -5,13 +5,15 @@ import { Input } from "../components/Input";
 import { Mark } from "../components/Mark";
 import { SiteFooter } from "../components/SiteFooter";
 import {
-  DEFAULT_API_BASE_URL,
-  LOCAL_API_PRESET,
   getStoredApiOverride,
   normalizeApiBaseUrl,
   resolveApiBaseUrl,
   setStoredApiOverride,
 } from "../lib/apiBase";
+import {
+  DEFAULT_LOCAL_API_BASE_URL,
+  DEFAULT_PRODUCTION_API_BASE_URL,
+} from "../lib/defaults";
 import { useApiBaseUrl } from "../lib/useApiBaseUrl";
 import "./DeveloperPage.css";
 
@@ -74,7 +76,7 @@ export function DeveloperPage() {
             </div>
             <div className="developer-meta-row">
               <dt>Production default</dt>
-              <dd className="developer-mono">{DEFAULT_API_BASE_URL}</dd>
+              <dd className="developer-mono">{DEFAULT_PRODUCTION_API_BASE_URL}</dd>
             </div>
           </dl>
 
@@ -97,7 +99,7 @@ export function DeveloperPage() {
               <Button
                 type="button"
                 variant="ghost"
-                onClick={() => applyOverride(LOCAL_API_PRESET)}
+                onClick={() => applyOverride(DEFAULT_LOCAL_API_BASE_URL)}
               >
                 Local
               </Button>
