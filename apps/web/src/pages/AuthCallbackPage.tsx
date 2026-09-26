@@ -5,7 +5,6 @@ import {
   attemptExtensionHandoff,
   authPathWithOAuthQuery,
   clearToken,
-  readOAuthRedirectUri,
   readOAuthState,
   readToken,
   readOAuthStateFromSearchParams,
@@ -16,7 +15,7 @@ import {
 import { AuthLayout } from "../components/AuthLayout";
 import { Button } from "../components/Button";
 
-type CallbackView = "loading" | "return" | "missed" | "empty" | "error" | "invalid-link";
+type CallbackView = "loading" | "return" | "missed" | "empty" | "error";
 
 const HANDOFF_TIMEOUT_MS = 2500;
 
@@ -43,24 +42,17 @@ export function AuthCallbackPage() {
 
   const issueAndHandoff = useCallback(
     async (sessionToken: string, onMissed?: () => void) => {
-      const targetRedirectUri =
-        resolveOAuthRedirectUriForHandoff(queryRedirectUri) ?? readOAuthRedirectUri();
       const targetState = oauthState ?? readOAuthState();
-
-      if (!targetRedirectUri) {
-        setView("invalid-link");
-        return;
-      }
 
       setBusy(true);
       try {
         const issued = await issueLoginCode(
           sessionToken,
-          targetRedirectUri,
+          redirectUri,
           targetState
         );
         attemptExtensionHandoff(
-          targetRedirectUri,
+          redirectUri,
           issued.code,
           issued.state ?? targetState
         );
@@ -76,7 +68,7 @@ export function AuthCallbackPage() {
         setBusy(false);
       }
     },
-    [redirectUri, queryRedirectUri, oauthState, clearHandoffTimer]
+    [redirectUri, oauthState, clearHandoffTimer]
   );
 
   useEffect(() => {
@@ -93,11 +85,6 @@ export function AuthCallbackPage() {
     getMe(sessionToken)
       .then(() => {
         setToken(sessionToken);
-        const handoffTarget = resolveOAuthRedirectUriForHandoff(queryRedirectUri);
-        if (!handoffTarget) {
-          setView("invalid-link");
-          return;
-        }
         setView("return");
       })
       .catch(() => {
@@ -123,19 +110,6 @@ export function AuthCallbackPage() {
       <AuthLayout page="callback" showMarkInCard>
         <div className="auth-loading-state" role="status" aria-live="polite">
           <div className="spinner" />
-        </div>
-      </AuthLayout>
-    );
-  }
-
-  if (view === "invalid-link") {
-    return (
-      <AuthLayout page="callback" showMarkInCard>
-        <div className="auth-card-header">
-          <h1 className="auth-card-title">Return to Cursor</h1>
-          <p className="auth-card-sub">
-            Open sign-in from the Cursor Sync extension to connect.
-          </p>
         </div>
       </AuthLayout>
     );

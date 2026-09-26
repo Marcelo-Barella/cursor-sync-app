@@ -37,10 +37,6 @@ export function normalizeExtensionRedirectUri(raw: string): string | null {
   }
 }
 
-export function isAllowedExtensionRedirectUri(uri: string): boolean {
-  return normalizeExtensionRedirectUri(uri) !== null;
-}
-
 export function readRedirectUriFromSearchParams(
   searchParams: Pick<URLSearchParams, "get">
 ): string | null {
@@ -145,11 +141,8 @@ export function resolveOAuthRedirectUri(
 
 export function resolveOAuthRedirectUriForHandoff(
   queryRedirectUri: string | null
-): string | null {
-  return (
-    resolveOAuthRedirectUri(queryRedirectUri) ??
-    normalizeExtensionRedirectUri(EXTENSION_AUTH_URI)
-  );
+): string {
+  return resolveOAuthRedirectUri(queryRedirectUri) ?? EXTENSION_AUTH_URI;
 }
 
 export function authPathWithOAuthQuery(

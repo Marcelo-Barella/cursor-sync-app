@@ -31,14 +31,6 @@ export function isAllowedRedirectUri(uri: string): boolean {
   return normalizeRedirectUri(uri) !== null;
 }
 
-export function appendCodeToRedirectUri(
-  redirectUri: string,
-  code: string,
-  state?: string
-): string {
-  return buildAuthCallbackRedirect(redirectUri, code, state);
-}
-
 export function buildAuthCallbackRedirect(
   redirectUri: string,
   code: string,
@@ -46,7 +38,6 @@ export function buildAuthCallbackRedirect(
 ): string {
   const normalized = normalizeRedirectUri(redirectUri) ?? redirectUri;
   const hashIndex = redirectUri.indexOf("#");
-  const base = hashIndex === -1 ? normalized : redirectUri.slice(0, hashIndex);
   const fragment = hashIndex === -1 ? "" : redirectUri.slice(hashIndex);
   const url = new URL(normalized);
   url.searchParams.set("code", code);
