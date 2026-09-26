@@ -57,7 +57,7 @@ authRoutes.post("/signup", async (c) => {
       "code" in err &&
       err.code === "23505"
     ) {
-      return c.json({ error: "Invalid email or password" }, 400);
+      return c.json({ error: "Email already registered" }, 409);
     }
     throw err;
   } finally {

@@ -1,8 +1,25 @@
+import {
+  DEFAULT_LOCAL_API_BASE_URL,
+  DEFAULT_PRODUCTION_API_BASE_URL,
+  DEFAULT_STAGING_API_BASE_URL,
+} from "./defaults";
+
 export const API_BASE_STORAGE_KEY = "cursor-sync-api-base-url";
-export const DEFAULT_API_BASE_URL = "https://api.sync.bergamota.dev";
-export const LOCAL_API_PRESET = "http://localhost:8100";
+export const DEFAULT_API_BASE_URL = DEFAULT_PRODUCTION_API_BASE_URL;
+export const STAGING_API_BASE_URL = DEFAULT_STAGING_API_BASE_URL;
+export const LOCAL_API_PRESET = DEFAULT_LOCAL_API_BASE_URL;
 
 export const API_BASE_CHANGED_EVENT = "cursor-sync-api-base-changed";
+
+export function defaultApiBaseForMode(mode: string = import.meta.env.MODE): string {
+  if (mode === "staging") {
+    return STAGING_API_BASE_URL;
+  }
+  if (mode === "production") {
+    return DEFAULT_API_BASE_URL;
+  }
+  return LOCAL_API_PRESET;
+}
 
 export function normalizeApiBaseUrl(raw: string): string | null {
   const trimmed = raw.trim();
@@ -50,6 +67,7 @@ export type ResolveApiBaseOptions = {
   search?: string;
   storage?: StorageLike | null;
   buildTimeUrl?: string;
+  mode?: string;
 };
 
 function readBuildTimeUrl(explicit?: string): string | undefined {
@@ -61,6 +79,7 @@ function readBuildTimeUrl(explicit?: string): string | undefined {
 }
 
 export function resolveApiBaseUrl(options: ResolveApiBaseOptions = {}): string {
+  const mode = options.mode ?? import.meta.env.MODE;
   const storage =
     options.storage ??
     (typeof localStorage !== "undefined" ? localStorage : null);
@@ -96,11 +115,36 @@ export function resolveApiBaseUrl(options: ResolveApiBaseOptions = {}): string {
     }
   }
 
-  return DEFAULT_API_BASE_URL;
+  return defaultApiBaseForMode(mode);
 }
 
 export function getApiBaseUrl(): string {
-  return resolveApiBaseUrl();
+  const resolved = resolveApiBaseUrl();
+  const normalized =
+    normalizeApiBaseUrl(resolved) ?? defaultApiBaseForMode(import.meta.env.MODE);
+  if (!normalized) {
+    return defaultApiBaseForMode(import.meta.env.MODE);
+  }
+  return normalized;
+}
+
+export function getApiBaseConfigurationError(): string | null {
+  const base = getApiBaseUrl();
+  if (!base.trim()) {
+    return messageForEmptyApiBase();
+  }
+  if (!normalizeApiBaseUrl(base)) {
+    return messageForEmptyApiBase();
+  }
+  return null;
+}
+
+function messageForEmptyApiBase(): string {
+  return "API base URL is not configured. Set VITE_API_URL when building the site, or set an API override on the Developer page.";
+}
+
+export function isProductionLikeMode(mode: string = import.meta.env.MODE): boolean {
+  return mode === "production" || mode === "staging";
 }
 
 export function getStoredApiOverride(

@@ -1,6 +1,8 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { signIn, signUp } from "../lib/api";
+import { getApiBaseConfigurationError } from "../lib/apiBase";
+import { mapAuthApiError } from "../lib/authErrors";
 import {
   authPathWithOAuthQuery,
   readOAuthState,
@@ -16,9 +18,6 @@ type AuthFormProps = {
   mode: "sign-in" | "sign-up";
 };
 
-const SIGN_IN_ERROR = "Email or password is wrong";
-const SIGN_UP_EMAIL_ERROR = "That email is already in use";
-
 export function AuthForm({ mode }: AuthFormProps) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -29,6 +28,9 @@ export function AuthForm({ mode }: AuthFormProps) {
   const [errorField, setErrorField] = useState<"email" | "password" | null>(null);
   const [loading, setLoading] = useState(false);
   const [oauthError, setOauthError] = useState<string | null>(null);
+  const [configError, setConfigError] = useState<string | null>(() =>
+    getApiBaseConfigurationError()
+  );
 
   const queryRedirectUri = searchParams.get("redirect_uri");
   const queryState = searchParams.get("state");
@@ -64,7 +66,13 @@ export function AuthForm({ mode }: AuthFormProps) {
     setError(null);
     setErrorField(null);
 
-    if (oauthError) {
+    if (oauthError || configError) {
+      return;
+    }
+
+    const apiConfigIssue = getApiBaseConfigurationError();
+    if (apiConfigIssue) {
+      setConfigError(apiConfigIssue);
       return;
     }
 
@@ -82,25 +90,21 @@ export function AuthForm({ mode }: AuthFormProps) {
         : await signIn(email.trim(), password);
       saveToken(auth.token);
       navigate(continuePath, { replace: true });
-    } catch {
-      if (isSignUp) {
-        setError(SIGN_UP_EMAIL_ERROR);
-        setErrorField("email");
-      } else {
-        setError(SIGN_IN_ERROR);
-        setErrorField("password");
-      }
+    } catch (caught) {
+      const mapped = mapAuthApiError(caught, mode);
+      setError(mapped.message);
+      setErrorField(mapped.field);
     } finally {
       setLoading(false);
     }
   }
 
-  if (oauthError) {
+  if (oauthError || configError) {
     return (
       <AuthLayout page={page}>
         <div className="auth-card-header">
           <h1 className="auth-card-title">{isSignUp ? "Create an account" : "Sign in"}</h1>
-          <p className="auth-card-sub">{oauthError}</p>
+          <p className="auth-card-sub">{oauthError ?? configError}</p>
         </div>
       </AuthLayout>
     );

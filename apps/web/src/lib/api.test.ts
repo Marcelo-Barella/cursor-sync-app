@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getMe, signIn, signUp } from "./api";
+import { AuthApiError } from "./authErrors";
 import { getApiBaseUrl } from "./apiBase";
 
 vi.mock("./apiBase", async (importOriginal) => {
@@ -63,17 +64,69 @@ describe("api auth", () => {
     });
   });
 
-  it("signIn surfaces API error messages", async () => {
+  it("signIn maps 401 responses to invalid credentials", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue({
         ok: false,
+        status: 401,
         json: async () => ({ error: "Invalid email or password" }),
       })
     );
 
-    await expect(signIn("user@example.com", "wrongpass")).rejects.toThrow(
-      "Invalid email or password"
+    await expect(signIn("user@example.com", "wrongpass")).rejects.toEqual(
+      expect.objectContaining<Partial<AuthApiError>>({
+        category: "invalid_credentials",
+      })
     );
+  });
+
+  it("signIn maps 404 responses to not found", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 404,
+        json: async () => null,
+      })
+    );
+
+    await expect(signIn("user@example.com", "password123")).rejects.toEqual(
+      expect.objectContaining({ category: "not_found" })
+    );
+  });
+
+  it("signIn maps network failures to network errors", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("Failed to fetch")));
+
+    await expect(signIn("user@example.com", "password123")).rejects.toEqual(
+      expect.objectContaining({ category: "network" })
+    );
+  });
+
+  it("signUp maps 409 responses to email taken", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 409,
+        json: async () => ({ error: "Email already registered" }),
+      })
+    );
+
+    await expect(signUp("user@example.com", "password123")).rejects.toEqual(
+      expect.objectContaining({ category: "email_taken" })
+    );
+  });
+
+  it("rejects an empty API base before calling fetch", async () => {
+    vi.mocked(getApiBaseUrl).mockReturnValue("");
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(signIn("user@example.com", "password123")).rejects.toEqual(
+      expect.objectContaining({ category: "misconfigured" })
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

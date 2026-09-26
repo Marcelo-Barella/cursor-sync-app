@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   API_BASE_STORAGE_KEY,
   DEFAULT_API_BASE_URL,
+  STAGING_API_BASE_URL,
   normalizeApiBaseUrl,
   readQueryApiOverride,
   resolveApiBaseUrl,
@@ -56,8 +57,29 @@ describe("resolveApiBaseUrl", () => {
   it("uses the production default when nothing else is set", () => {
     const storage = createMemoryStorage();
     expect(
-      resolveApiBaseUrl({ storage, search: "", buildTimeUrl: "" })
+      resolveApiBaseUrl({ storage, search: "", buildTimeUrl: "", mode: "production" })
     ).toBe(DEFAULT_API_BASE_URL);
+  });
+
+  it("uses the staging default when nothing else is set in staging mode", () => {
+    const storage = createMemoryStorage();
+    expect(
+      resolveApiBaseUrl({ storage, search: "", buildTimeUrl: "", mode: "staging" })
+    ).toBe(STAGING_API_BASE_URL);
+  });
+
+  it("never returns an empty string as a usable API base in production-like modes", () => {
+    const storage = createMemoryStorage();
+    for (const mode of ["production", "staging"] as const) {
+      const url = resolveApiBaseUrl({
+        storage,
+        search: "",
+        buildTimeUrl: "",
+        mode,
+      });
+      expect(url).not.toBe("");
+      expect(normalizeApiBaseUrl(url)).not.toBeNull();
+    }
   });
 
   it("uses VITE_API_URL when provided at build time", () => {
