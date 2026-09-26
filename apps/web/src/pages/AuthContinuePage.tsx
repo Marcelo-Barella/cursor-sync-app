@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { getMe, issueLoginCode } from "../lib/api";
 import {
@@ -7,8 +7,10 @@ import {
   clearToken,
   readOAuthRedirectUri,
   readOAuthState,
+  readOAuthStateFromSearchParams,
+  readRedirectUriFromSearchParams,
   readToken,
-  resolveOAuthRedirectUri,
+  resolveOAuthRedirectUriForHandoff,
   saveOAuthParams,
 } from "../lib/auth";
 import { AuthLayout } from "../components/AuthLayout";
@@ -23,17 +25,14 @@ export function AuthContinuePage() {
   const [token, setToken] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [handoffError, setHandoffError] = useState<string | null>(null);
+  const handoffStarted = useRef(false);
 
-  const queryRedirectUri = searchParams.get("redirect_uri");
-  const queryState = searchParams.get("state");
-  const redirectUri = resolveOAuthRedirectUri(queryRedirectUri);
+  const queryRedirectUri = readRedirectUriFromSearchParams(searchParams);
+  const queryState = readOAuthStateFromSearchParams(searchParams);
   const oauthState = queryState ?? readOAuthState();
+  const redirectUri = resolveOAuthRedirectUriForHandoff(queryRedirectUri);
 
   useEffect(() => {
-    if (queryRedirectUri && !redirectUri) {
-      setState("invalid-link");
-      return;
-    }
     if (redirectUri) {
       saveOAuthParams(redirectUri, oauthState);
     }
@@ -47,7 +46,8 @@ export function AuthContinuePage() {
     getMe(sessionToken)
       .then(() => {
         setToken(sessionToken);
-        if (!redirectUri) {
+        const handoffTarget = resolveOAuthRedirectUriForHandoff(queryRedirectUri);
+        if (!handoffTarget) {
           setState("invalid-link");
           return;
         }
@@ -64,7 +64,8 @@ export function AuthContinuePage() {
   const performHandoff = useCallback(async () => {
     const sessionToken = token ?? readToken();
     const targetRedirectUri =
-      redirectUri ?? resolveOAuthRedirectUri(queryRedirectUri) ?? readOAuthRedirectUri();
+      resolveOAuthRedirectUriForHandoff(queryRedirectUri) ??
+      readOAuthRedirectUri();
     const targetState = oauthState ?? readOAuthState();
 
     if (!sessionToken || !targetRedirectUri) {
@@ -92,7 +93,15 @@ export function AuthContinuePage() {
     } finally {
       setBusy(false);
     }
-  }, [token, redirectUri, queryRedirectUri, oauthState, navigate, callbackPath]);
+  }, [token, queryRedirectUri, oauthState, navigate, callbackPath]);
+
+  useEffect(() => {
+    if (state !== "ready" || busy || handoffStarted.current) {
+      return;
+    }
+    handoffStarted.current = true;
+    void performHandoff();
+  }, [state, busy, performHandoff]);
 
   const signInPath = authPathWithOAuthQuery("/sign-in", redirectUri, oauthState);
 

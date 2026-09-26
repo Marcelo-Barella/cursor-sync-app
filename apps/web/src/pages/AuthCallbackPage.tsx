@@ -8,7 +8,9 @@ import {
   readOAuthRedirectUri,
   readOAuthState,
   readToken,
-  resolveOAuthRedirectUri,
+  readOAuthStateFromSearchParams,
+  readRedirectUriFromSearchParams,
+  resolveOAuthRedirectUriForHandoff,
   saveOAuthParams,
 } from "../lib/auth";
 import { AuthLayout } from "../components/AuthLayout";
@@ -25,9 +27,9 @@ export function AuthCallbackPage() {
   const [busy, setBusy] = useState(false);
   const handoffTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const queryRedirectUri = searchParams.get("redirect_uri");
-  const queryState = searchParams.get("state");
-  const redirectUri = resolveOAuthRedirectUri(queryRedirectUri);
+  const queryRedirectUri = readRedirectUriFromSearchParams(searchParams);
+  const queryState = readOAuthStateFromSearchParams(searchParams);
+  const redirectUri = resolveOAuthRedirectUriForHandoff(queryRedirectUri);
   const oauthState = queryState ?? readOAuthState();
 
   const signInPath = authPathWithOAuthQuery("/sign-in", redirectUri, oauthState);
@@ -42,7 +44,7 @@ export function AuthCallbackPage() {
   const issueAndHandoff = useCallback(
     async (sessionToken: string, onMissed?: () => void) => {
       const targetRedirectUri =
-        redirectUri ?? resolveOAuthRedirectUri(queryRedirectUri) ?? readOAuthRedirectUri();
+        resolveOAuthRedirectUriForHandoff(queryRedirectUri) ?? readOAuthRedirectUri();
       const targetState = oauthState ?? readOAuthState();
 
       if (!targetRedirectUri) {
@@ -78,10 +80,6 @@ export function AuthCallbackPage() {
   );
 
   useEffect(() => {
-    if (queryRedirectUri && !redirectUri) {
-      setView("invalid-link");
-      return;
-    }
     if (redirectUri) {
       saveOAuthParams(redirectUri, oauthState);
     }
@@ -95,7 +93,8 @@ export function AuthCallbackPage() {
     getMe(sessionToken)
       .then(() => {
         setToken(sessionToken);
-        if (!redirectUri && !readOAuthRedirectUri()) {
+        const handoffTarget = resolveOAuthRedirectUriForHandoff(queryRedirectUri);
+        if (!handoffTarget) {
           setView("invalid-link");
           return;
         }

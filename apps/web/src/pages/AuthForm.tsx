@@ -12,6 +12,8 @@ import {
   authPathWithOAuthQuery,
   EXTENSION_AUTH_URI,
   readOAuthState,
+  readOAuthStateFromSearchParams,
+  readRedirectUriFromSearchParams,
   resolveOAuthRedirectUri,
   saveOAuthParams,
   saveToken,
@@ -45,13 +47,16 @@ export function AuthForm({ mode }: AuthFormProps) {
   const [loading, setLoading] = useState(false);
   const [oauthError, setOauthError] = useState<string | null>(null);
 
-  const queryRedirectUri = searchParams.get("redirect_uri");
-  const queryState = searchParams.get("state");
-  const redirectUri = resolveOAuthRedirectUri(queryRedirectUri);
+  const rawRedirectQuery =
+    searchParams.get("redirect_uri") ??
+    searchParams.get("redirectUri") ??
+    searchParams.get("redirect");
+  const queryState = readOAuthStateFromSearchParams(searchParams);
+  const redirectUri = resolveOAuthRedirectUri(rawRedirectQuery);
   const oauthState = queryState ?? readOAuthState();
 
   useEffect(() => {
-    if (queryRedirectUri && !redirectUri) {
+    if (rawRedirectQuery?.trim() && !redirectUri) {
       setOauthError(
         "This sign-in link is not valid. Open sign-in from the Cursor Sync extension."
       );
@@ -61,7 +66,7 @@ export function AuthForm({ mode }: AuthFormProps) {
     if (redirectUri) {
       saveOAuthParams(redirectUri, oauthState);
     }
-  }, [queryRedirectUri, redirectUri, oauthState]);
+  }, [rawRedirectQuery, redirectUri, oauthState]);
 
   const isSignUp = mode === "sign-up";
   const page = isSignUp ? "sign-up" : "sign-in";
@@ -118,6 +123,9 @@ export function AuthForm({ mode }: AuthFormProps) {
         ? await signUp(email.trim(), password)
         : await signIn(email.trim(), password);
       saveToken(auth.token);
+      if (redirectUri) {
+        saveOAuthParams(redirectUri, oauthState);
+      }
       navigate(continuePath, { replace: true });
     } catch (caught) {
       setFormError(mapAuthApiError(caught));
