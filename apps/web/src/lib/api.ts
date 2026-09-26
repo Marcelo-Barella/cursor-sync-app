@@ -1,3 +1,10 @@
+import { getApiBaseUrlForAuth } from "./apiBase";
+import {
+  AuthApiError,
+  messageForAuthErrorCategory,
+  type AuthErrorCategory,
+} from "./authErrors";
+
 export type AuthResponse = {
   token: string;
 };
@@ -6,22 +13,9 @@ export type AuthError = {
   error: string;
 };
 
-import { getApiBaseUrlForAuth, isAuthApiBaseMissing } from "./apiBase";
-import {
-  AuthApiError,
-  messageForAuthErrorCategory,
-  type AuthErrorCategory,
-} from "./authErrors";
-
 const AUTH_FETCH_TIMEOUT_MS = 30_000;
 
 function requireApiBaseUrl(): string {
-  if (isAuthApiBaseMissing()) {
-    throw new AuthApiError(
-      "empty_api_base",
-      messageForAuthErrorCategory("empty_api_base")
-    );
-  }
   const base = getApiBaseUrlForAuth();
   if (!base) {
     throw new AuthApiError(
@@ -77,15 +71,6 @@ function categoryForHttpStatus(
   }
   if (status === 400 && hasAuthBody) {
     return "validation_password";
-  }
-  if (status === 502 || status === 503) {
-    return "server";
-  }
-  if (!hasAuthBody) {
-    if (status >= 500) {
-      return "server";
-    }
-    return "unavailable";
   }
   return "unavailable";
 }
