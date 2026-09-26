@@ -14,6 +14,7 @@ import {
   saveOAuthParams,
 } from "../lib/auth";
 import {
+  clearPendingLoginCode,
   readPendingLoginCode,
   savePendingLoginCode,
 } from "../lib/loginHandoff";
@@ -162,6 +163,7 @@ export function AuthCallbackPage() {
 
   function handleRefreshCode() {
     if (!token) return;
+    clearPendingLoginCode();
     codeIssued.current = false;
     setBusy(true);
     void ensureLoginCode(token)
