@@ -13,7 +13,6 @@ import {
   EXTENSION_AUTH_URI,
   readOAuthState,
   readOAuthStateFromSearchParams,
-  readRedirectUriFromSearchParams,
   resolveOAuthRedirectUri,
   saveOAuthParams,
   saveToken,
