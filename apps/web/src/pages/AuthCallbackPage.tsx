@@ -14,6 +14,7 @@ import {
   saveOAuthParams,
 } from "../lib/auth";
 import {
+  clearPendingLoginCode,
   readPendingLoginCode,
   savePendingLoginCode,
 } from "../lib/loginHandoff";
@@ -138,11 +139,10 @@ export function AuthCallbackPage() {
         }
         codeIssued.current = true;
         const code = await ensureLoginCode(sessionToken);
+        setView("return");
         if (!code) {
-          setView("error");
           return;
         }
-        setView("return");
       })
       .catch(() => {
         clearToken();
@@ -159,7 +159,7 @@ export function AuthCallbackPage() {
 
   function handleRefreshCode() {
     if (!token) return;
-    codeIssued.current = false;
+    clearPendingLoginCode();
     setBusy(true);
     void ensureLoginCode(token).finally(() => setBusy(false));
   }
@@ -263,15 +263,26 @@ export function AuthCallbackPage() {
         </p>
       ) : null}
       <div className="auth-card-actions">
-        <Button
-          variant="primary"
-          fullWidth
-          loading={busy}
-          disabled={!loginCode}
-          onClick={handleReturnToCursor}
-        >
-          Return to Cursor
-        </Button>
+        {loginCode ? (
+          <Button
+            variant="primary"
+            fullWidth
+            loading={busy}
+            onClick={handleReturnToCursor}
+          >
+            Return to Cursor
+          </Button>
+        ) : (
+          <Button
+            type="button"
+            variant="primary"
+            fullWidth
+            loading={busy}
+            onClick={handleRefreshCode}
+          >
+            Try again
+          </Button>
+        )}
         <p className="auth-card-helper">This tab can close after you connect in Cursor.</p>
       </div>
     </AuthLayout>
