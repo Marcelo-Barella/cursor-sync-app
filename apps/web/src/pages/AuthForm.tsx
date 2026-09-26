@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { signIn, signUp } from "../lib/api";
 import { isAuthApiBaseMissing } from "../lib/apiBase";
+import { saveEmailVerificationNotice } from "../lib/emailVerificationNotice";
 import {
   AuthApiError,
   mapAuthApiError,
@@ -121,6 +122,12 @@ export function AuthForm({ mode }: AuthFormProps) {
       const auth = isSignUp
         ? await signUp(email.trim(), password)
         : await signIn(email.trim(), password);
+      if (isSignUp) {
+        saveEmailVerificationNotice({
+          sent: auth.verificationEmailSent === true,
+          warning: auth.verificationEmailWarning,
+        });
+      }
       saveToken(auth.token);
       if (redirectUri) {
         saveOAuthParams(redirectUri, oauthState);

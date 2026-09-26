@@ -24,6 +24,11 @@ services:
       DATABASE_URL: postgres://cursor_sync:cursor_sync@postgres:5432/cursor_sync
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
       PORT: "8100"
+      PUBLIC_WEB_ORIGIN: ${PUBLIC_WEB_ORIGIN:-}
+      WEB_ORIGIN: ${WEB_ORIGIN:-}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-}
+      RESEND_FROM_NAME: ${RESEND_FROM_NAME:-}
       CLOUDFLARE_ACCOUNT_ID: ${CLOUDFLARE_ACCOUNT_ID:-}
       CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN:-}
       R2_BUCKET: ${R2_BUCKET:-cursor-sync-lab}

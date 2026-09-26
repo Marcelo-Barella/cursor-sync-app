@@ -12,6 +12,10 @@ import {
   resolveOAuthRedirectUriForHandoff,
   saveOAuthParams,
 } from "../lib/auth";
+import {
+  clearEmailVerificationNotice,
+  readEmailVerificationNotice,
+} from "../lib/emailVerificationNotice";
 import { savePendingLoginCode } from "../lib/loginHandoff";
 import { AuthLayout } from "../components/AuthLayout";
 import { Button } from "../components/Button";
@@ -28,7 +32,23 @@ export function AuthContinuePage() {
   const [emailVerified, setEmailVerified] = useState(true);
   const [resendBusy, setResendBusy] = useState(false);
   const [resendMessage, setResendMessage] = useState<string | null>(null);
+  const [signupNotice, setSignupNotice] = useState<string | null>(null);
   const handoffStarted = useRef(false);
+
+  useEffect(() => {
+    const notice = readEmailVerificationNotice();
+    if (!notice) {
+      return;
+    }
+    clearEmailVerificationNotice();
+    if (notice.sent) {
+      setSignupNotice("We sent a verification link to your email.");
+    } else if (notice.warning) {
+      setSignupNotice(notice.warning);
+    } else {
+      setSignupNotice("Check your email for a verification link.");
+    }
+  }, []);
 
   const queryRedirectUri = readRedirectUriFromSearchParams(searchParams);
   const queryState = readOAuthStateFromSearchParams(searchParams);
@@ -191,7 +211,8 @@ export function AuthContinuePage() {
       {!emailVerified ? (
         <div className="auth-form-error-block" role="status">
           <p className="auth-form-error-muted">
-            Verify your email address. We sent a link when you signed up.
+            {signupNotice ??
+              "Verify your email address. We sent a link when you signed up."}
           </p>
           {resendMessage ? (
             <p className="auth-card-sub">{resendMessage}</p>

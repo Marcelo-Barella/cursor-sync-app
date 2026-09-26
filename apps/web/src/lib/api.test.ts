@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { getMe, signIn, signUp } from "./api";
+import { getMe, signIn, signUp, verifyEmail } from "./api";
 import { AuthApiError } from "./authErrors";
 import { getApiBaseUrlForAuth, isAuthApiBaseMissing } from "./apiBase";
 
@@ -121,6 +121,24 @@ describe("api auth", () => {
 
     await expect(signUp("user@example.com", "password123")).rejects.toEqual(
       expect.objectContaining({ category: "email_taken" })
+    );
+  });
+
+  it("verifyEmail posts token to verify-email", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ ok: true, emailVerified: true }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await verifyEmail("raw-token");
+    expect(result.emailVerified).toBe(true);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.example.com/auth/verify-email",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ token: "raw-token" }),
+      })
     );
   });
 
