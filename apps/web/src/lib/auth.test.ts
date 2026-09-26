@@ -3,38 +3,35 @@ import {
   buildExtensionAuthRedirectUrl,
   EXTENSION_AUTH_URI,
   HANDOFF_ATTEMPTED_KEY,
-  isAllowedExtensionRedirectUri,
   normalizeExtensionRedirectUri,
   resolveOAuthRedirectUri,
   resolveOAuthRedirectUriForHandoff,
 } from "./auth";
 
-describe("isAllowedExtensionRedirectUri", () => {
+describe("normalizeExtensionRedirectUri", () => {
   it("accepts cursor and vscode schemes for the extension auth path", () => {
-    expect(isAllowedExtensionRedirectUri(EXTENSION_AUTH_URI)).toBe(true);
+    expect(normalizeExtensionRedirectUri(EXTENSION_AUTH_URI)).toBe(
+      "cursor://marcelobarella.cursor-sync/auth"
+    );
     expect(
-      isAllowedExtensionRedirectUri("vscode://MarceloBarella.cursor-sync/auth")
-    ).toBe(true);
+      normalizeExtensionRedirectUri("vscode://MarceloBarella.cursor-sync/auth")
+    ).toBe("vscode://marcelobarella.cursor-sync/auth");
     expect(
-      isAllowedExtensionRedirectUri("cursor://marcelobarella.cursor-sync/auth")
-    ).toBe(true);
+      normalizeExtensionRedirectUri("cursor://marcelobarella.cursor-sync/auth")
+    ).toBe("cursor://marcelobarella.cursor-sync/auth");
     expect(
-      isAllowedExtensionRedirectUri("cursor://MarceloBarella.cursor-sync/auth/")
-    ).toBe(true);
+      normalizeExtensionRedirectUri("cursor://MarceloBarella.cursor-sync/auth/")
+    ).toBe("cursor://marcelobarella.cursor-sync/auth");
   });
 
   it("rejects other schemes, hosts, and paths", () => {
-    expect(isAllowedExtensionRedirectUri("https://evil.example/auth")).toBe(false);
-    expect(isAllowedExtensionRedirectUri("cursor://other.cursor-sync/auth")).toBe(
-      false
-    );
-    expect(isAllowedExtensionRedirectUri("cursor://MarceloBarella.cursor-sync/other")).toBe(
-      false
-    );
+    expect(normalizeExtensionRedirectUri("https://evil.example/auth")).toBeNull();
+    expect(normalizeExtensionRedirectUri("cursor://other.cursor-sync/auth")).toBeNull();
+    expect(
+      normalizeExtensionRedirectUri("cursor://MarceloBarella.cursor-sync/other")
+    ).toBeNull();
   });
-});
 
-describe("normalizeExtensionRedirectUri", () => {
   it("canonicalizes allowed URIs", () => {
     expect(
       normalizeExtensionRedirectUri("cursor://MarceloBarella.cursor-sync/auth/")

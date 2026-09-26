@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
-  appendCodeToRedirectUri,
   buildAuthCallbackRedirect,
   isAllowedRedirectUri,
 } from "./redirect-uri.js";
@@ -41,12 +40,14 @@ describe("buildAuthCallbackRedirect", () => {
     assert.match(uri, /state=opaque/);
   });
 
-  it("matches appendCodeToRedirectUri behavior", () => {
-    const code = "test-code";
-    const base = "vscode://MarceloBarella.cursor-sync/auth";
-    assert.equal(
-      appendCodeToRedirectUri(base, code, "s1"),
-      buildAuthCallbackRedirect(base, code, "s1")
+  it("preserves fragment from the original redirect URI", () => {
+    const uri = buildAuthCallbackRedirect(
+      "vscode://MarceloBarella.cursor-sync/auth#panel=1",
+      "test-code",
+      "s1"
     );
+    assert.match(uri, /code=test-code/);
+    assert.match(uri, /state=s1/);
+    assert.match(uri, /#panel=1$/);
   });
 });

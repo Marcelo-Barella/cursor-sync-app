@@ -37,10 +37,6 @@ export function normalizeExtensionRedirectUri(raw: string): string | null {
   }
 }
 
-export function isAllowedExtensionRedirectUri(uri: string): boolean {
-  return normalizeExtensionRedirectUri(uri) !== null;
-}
-
 export function readRedirectUriFromSearchParams(
   searchParams: Pick<URLSearchParams, "get">
 ): string | null {
@@ -145,10 +141,11 @@ export function resolveOAuthRedirectUri(
 
 export function resolveOAuthRedirectUriForHandoff(
   queryRedirectUri: string | null
-): string | null {
+): string {
   return (
     resolveOAuthRedirectUri(queryRedirectUri) ??
-    normalizeExtensionRedirectUri(EXTENSION_AUTH_URI)
+    normalizeExtensionRedirectUri(EXTENSION_AUTH_URI) ??
+    "cursor://marcelobarella.cursor-sync/auth"
   );
 }
 
