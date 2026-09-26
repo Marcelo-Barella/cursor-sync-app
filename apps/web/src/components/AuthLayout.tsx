@@ -5,7 +5,7 @@ import "./AuthLayout.css";
 
 type AuthLayoutProps = {
   children: ReactNode;
-  page: "sign-in" | "sign-up" | "continue" | "callback";
+  page: "sign-in" | "sign-up" | "continue" | "callback" | "verify";
   showMarkInCard?: boolean;
 };
 

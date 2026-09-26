@@ -1,5 +1,8 @@
 export type AuthResponse = {
   token: string;
+  emailVerified?: boolean;
+  verificationEmailSent?: boolean;
+  verificationEmailWarning?: string;
 };
 
 export type AuthError = {
@@ -199,7 +202,37 @@ async function parseJson<T>(response: Response): Promise<T> {
   return data as T;
 }
 
-export async function getMe(token: string): Promise<{ id: string; email: string }> {
+export type MeResponse = {
+  id: string;
+  email: string;
+  emailVerified?: boolean;
+};
+
+export async function verifyEmail(token: string): Promise<{ ok: boolean; emailVerified: boolean }> {
+  const base = requireApiBaseUrl();
+  const response = await fetch(`${base}/auth/verify-email`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token }),
+  });
+  return parseJson(response);
+}
+
+export async function resendVerificationEmail(
+  token: string
+): Promise<{ sent: boolean; warning?: string; alreadyVerified?: boolean }> {
+  const base = requireApiBaseUrl();
+  const response = await fetch(`${base}/auth/resend-verification`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  return parseJson(response);
+}
+
+export async function getMe(token: string): Promise<MeResponse> {
   const base = requireApiBaseUrl();
   const response = await fetch(`${base}/auth/me`, {
     headers: { Authorization: `Bearer ${token}` },

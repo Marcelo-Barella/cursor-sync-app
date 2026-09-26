@@ -4,6 +4,7 @@ import { SignInPage } from "./pages/SignInPage";
 import { SignUpPage } from "./pages/SignUpPage";
 import { AuthContinuePage } from "./pages/AuthContinuePage";
 import { AuthCallbackPage } from "./pages/AuthCallbackPage";
+import { AuthVerifyPage } from "./pages/AuthVerifyPage";
 
 export function App() {
   return (
@@ -14,6 +15,7 @@ export function App() {
         <Route path="/sign-up" element={<SignUpPage />} />
         <Route path="/auth/continue" element={<AuthContinuePage />} />
         <Route path="/auth/callback" element={<AuthCallbackPage />} />
+        <Route path="/auth/verify" element={<AuthVerifyPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
