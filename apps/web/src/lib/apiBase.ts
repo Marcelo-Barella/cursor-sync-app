@@ -3,8 +3,6 @@ import {
   DEFAULT_PRODUCTION_API_BASE_URL,
   DEFAULT_STAGING_API_BASE_URL,
 } from "./defaults";
-import { messageForAuthErrorCategory } from "./authErrors";
-
 export const API_BASE_STORAGE_KEY = "cursor-sync-api-base-url";
 export const DEFAULT_API_BASE_URL = DEFAULT_PRODUCTION_API_BASE_URL;
 export const STAGING_API_BASE_URL = DEFAULT_STAGING_API_BASE_URL;
@@ -79,13 +77,6 @@ export function readBuildTimeApiUrl(explicit?: string): string | undefined {
   return raw;
 }
 
-export function isBuildTimeApiBaseConfigured(options?: {
-  buildTimeUrl?: string;
-}): boolean {
-  const raw = readBuildTimeApiUrl(options?.buildTimeUrl);
-  return raw !== undefined && normalizeApiBaseUrl(raw) !== null;
-}
-
 export function resolveApiBaseUrl(options: ResolveApiBaseOptions = {}): string {
   const mode = options.mode ?? import.meta.env.MODE;
   const storage =
@@ -127,37 +118,14 @@ export function resolveApiBaseUrl(options: ResolveApiBaseOptions = {}): string {
 }
 
 export function getApiBaseUrl(): string {
-  const resolved = resolveApiBaseUrl();
-  const normalized = normalizeApiBaseUrl(resolved);
-  if (normalized) {
-    return normalized;
-  }
-  const fallback = defaultApiBaseForMode(import.meta.env.MODE);
-  return fallback;
+  return (
+    normalizeApiBaseUrl(resolveApiBaseUrl()) ??
+    defaultApiBaseForMode(import.meta.env.MODE)
+  );
 }
 
 export function getApiBaseUrlForAuth(): string | null {
-  const resolved = resolveApiBaseUrl();
-  const normalized = normalizeApiBaseUrl(resolved);
-  if (normalized) {
-    return normalized;
-  }
-  return null;
-}
-
-export function isAuthApiBaseMissing(): boolean {
-  return getApiBaseUrlForAuth() === null;
-}
-
-export function getApiBaseConfigurationError(): string | null {
-  if (isAuthApiBaseMissing()) {
-    return messageForAuthErrorCategory("empty_api_base");
-  }
-  return null;
-}
-
-export function isProductionLikeMode(mode: string = import.meta.env.MODE): boolean {
-  return mode === "production" || mode === "staging";
+  return normalizeApiBaseUrl(resolveApiBaseUrl());
 }
 
 export function getStoredApiOverride(
@@ -192,13 +160,11 @@ export function applyApiQueryParamFromLocation(): void {
   }
   const queryOverride = readQueryApiOverride(window.location.search);
   if (queryOverride?.action === "set") {
-    localStorage.setItem(API_BASE_STORAGE_KEY, queryOverride.url);
-    notifyApiBaseChanged();
+    setStoredApiOverride(queryOverride.url);
     return;
   }
   if (queryOverride?.action === "clear") {
-    localStorage.removeItem(API_BASE_STORAGE_KEY);
-    notifyApiBaseChanged();
+    setStoredApiOverride(null);
   }
 }
 

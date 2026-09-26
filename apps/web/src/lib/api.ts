@@ -1,3 +1,10 @@
+import { getApiBaseUrlForAuth } from "./apiBase";
+import {
+  AuthApiError,
+  messageForAuthErrorCategory,
+  type AuthErrorCategory,
+} from "./authErrors";
+
 export type AuthResponse = {
   token: string;
 };
@@ -6,22 +13,9 @@ export type AuthError = {
   error: string;
 };
 
-import { getApiBaseUrlForAuth, isAuthApiBaseMissing } from "./apiBase";
-import {
-  AuthApiError,
-  messageForAuthErrorCategory,
-  type AuthErrorCategory,
-} from "./authErrors";
-
 const AUTH_FETCH_TIMEOUT_MS = 30_000;
 
 function requireApiBaseUrl(): string {
-  if (isAuthApiBaseMissing()) {
-    throw new AuthApiError(
-      "empty_api_base",
-      messageForAuthErrorCategory("empty_api_base")
-    );
-  }
   const base = getApiBaseUrlForAuth();
   if (!base) {
     throw new AuthApiError(
@@ -69,51 +63,19 @@ function categoryForHttpStatus(
   if (status >= 500) {
     return "server";
   }
-  if (status === 409 && mode === "sign-up" && hasAuthBody) {
-    return "email_taken";
-  }
-  if (status === 401 && mode === "sign-in" && hasAuthBody) {
-    return "invalid_credentials";
-  }
-  if (status === 400 && hasAuthBody) {
-    return "validation_password";
-  }
-  if (status === 502 || status === 503) {
-    return "server";
-  }
   if (!hasAuthBody) {
-    if (status >= 500) {
-      return "server";
-    }
     return "unavailable";
   }
+  if (status === 409 && mode === "sign-up") {
+    return "email_taken";
+  }
+  if (status === 401 && mode === "sign-in") {
+    return "invalid_credentials";
+  }
+  if (status === 400) {
+    return "validation_password";
+  }
   return "unavailable";
-}
-
-function messageFromApiBody(
-  body: unknown,
-  category: AuthErrorCategory,
-  email: string,
-  mode: "sign-in" | "sign-up"
-): string {
-  if (category === "validation_password" || category === "validation_email") {
-    if (body && typeof body === "object" && "error" in body) {
-      const inferred = inferValidationCategory(body, email, mode);
-      return messageForAuthErrorCategory(inferred);
-    }
-  }
-  if (body && typeof body === "object" && "error" in body) {
-    if (category === "email_taken") {
-      return messageForAuthErrorCategory("email_taken");
-    }
-    if (category === "invalid_credentials") {
-      return messageForAuthErrorCategory("invalid_credentials");
-    }
-    if (category === "rate_limit") {
-      return messageForAuthErrorCategory("rate_limit");
-    }
-  }
-  return messageForAuthErrorCategory(category);
 }
 
 async function authFetch(path: string, init: RequestInit): Promise<Response> {
@@ -151,16 +113,11 @@ async function parseAuthJson<T>(
     if (response.status === 400 && hasAuthBody) {
       category = inferValidationCategory(data, email, mode);
     }
-    if (
-      response.status === 409 &&
-      mode === "sign-up" &&
-      hasAuthBody &&
-      /already|registered|in use/i.test(String((data as AuthError).error))
-    ) {
-      category = "email_taken";
-    }
-    const message = messageFromApiBody(data, category, email, mode);
-    throw new AuthApiError(category, message, response.status);
+    throw new AuthApiError(
+      category,
+      messageForAuthErrorCategory(category),
+      response.status
+    );
   }
   return data as T;
 }

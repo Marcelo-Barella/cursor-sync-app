@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { signIn, signUp } from "../lib/api";
-import { isAuthApiBaseMissing } from "../lib/apiBase";
+import { getApiBaseUrlForAuth } from "../lib/apiBase";
 import {
   AuthApiError,
   mapAuthApiError,
@@ -24,14 +24,12 @@ type AuthFormProps = {
   mode: "sign-in" | "sign-up";
 };
 
-function emptyApiBaseFormError(): MappedAuthFormError {
-  return mapAuthApiError(
-    new AuthApiError(
-      "empty_api_base",
-      messageForAuthErrorCategory("empty_api_base")
-    )
-  );
-}
+const emptyApiBaseFormError = mapAuthApiError(
+  new AuthApiError(
+    "empty_api_base",
+    messageForAuthErrorCategory("empty_api_base")
+  )
+);
 
 export function AuthForm({ mode }: AuthFormProps) {
   const navigate = useNavigate();
@@ -40,7 +38,7 @@ export function AuthForm({ mode }: AuthFormProps) {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [formError, setFormError] = useState<MappedAuthFormError | null>(() =>
-    isAuthApiBaseMissing() ? emptyApiBaseFormError() : null
+    getApiBaseUrlForAuth() === null ? emptyApiBaseFormError : null
   );
   const [loading, setLoading] = useState(false);
   const [oauthError, setOauthError] = useState<string | null>(null);
@@ -95,8 +93,8 @@ export function AuthForm({ mode }: AuthFormProps) {
       return;
     }
 
-    if (isAuthApiBaseMissing()) {
-      setFormError(emptyApiBaseFormError());
+    if (getApiBaseUrlForAuth() === null) {
+      setFormError(emptyApiBaseFormError);
       return;
     }
 

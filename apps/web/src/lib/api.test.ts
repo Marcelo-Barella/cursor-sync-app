@@ -1,20 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getMe, signIn, signUp } from "./api";
 import { AuthApiError } from "./authErrors";
-import { getApiBaseUrlForAuth, isAuthApiBaseMissing } from "./apiBase";
+import { getApiBaseUrlForAuth } from "./apiBase";
 
 vi.mock("./apiBase", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./apiBase")>();
   return {
     ...actual,
     getApiBaseUrlForAuth: vi.fn(actual.getApiBaseUrlForAuth),
-    isAuthApiBaseMissing: vi.fn(actual.isAuthApiBaseMissing),
   };
 });
 
 describe("api auth", () => {
   beforeEach(() => {
-    vi.mocked(isAuthApiBaseMissing).mockReturnValue(false);
     vi.mocked(getApiBaseUrlForAuth).mockReturnValue("https://api.example.com");
   });
 
@@ -125,7 +123,6 @@ describe("api auth", () => {
   });
 
   it("rejects a missing API base before calling fetch", async () => {
-    vi.mocked(isAuthApiBaseMissing).mockReturnValue(true);
     vi.mocked(getApiBaseUrlForAuth).mockReturnValue(null);
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
