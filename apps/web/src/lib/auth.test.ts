@@ -1,14 +1,95 @@
 import { describe, expect, it } from "vitest";
 import {
-  buildExtensionAuthUrl,
+  buildExtensionAuthRedirectUrl,
   EXTENSION_AUTH_URI,
   HANDOFF_ATTEMPTED_KEY,
+  isAllowedExtensionRedirectUri,
+  normalizeExtensionRedirectUri,
+  resolveOAuthRedirectUri,
+  resolveOAuthRedirectUriForHandoff,
 } from "./auth";
 
-describe("buildExtensionAuthUrl", () => {
-  it("builds the cursor extension auth deep link with token", () => {
-    const url = buildExtensionAuthUrl("jwt-token-123");
-    expect(url).toBe(`${EXTENSION_AUTH_URI}?token=jwt-token-123`);
+describe("isAllowedExtensionRedirectUri", () => {
+  it("accepts cursor and vscode schemes for the extension auth path", () => {
+    expect(isAllowedExtensionRedirectUri(EXTENSION_AUTH_URI)).toBe(true);
+    expect(
+      isAllowedExtensionRedirectUri("vscode://MarceloBarella.cursor-sync/auth")
+    ).toBe(true);
+    expect(
+      isAllowedExtensionRedirectUri("cursor://marcelobarella.cursor-sync/auth")
+    ).toBe(true);
+    expect(
+      isAllowedExtensionRedirectUri("cursor://MarceloBarella.cursor-sync/auth/")
+    ).toBe(true);
+  });
+
+  it("rejects other schemes, hosts, and paths", () => {
+    expect(isAllowedExtensionRedirectUri("https://evil.example/auth")).toBe(false);
+    expect(isAllowedExtensionRedirectUri("cursor://other.cursor-sync/auth")).toBe(
+      false
+    );
+    expect(isAllowedExtensionRedirectUri("cursor://MarceloBarella.cursor-sync/other")).toBe(
+      false
+    );
+  });
+});
+
+describe("normalizeExtensionRedirectUri", () => {
+  it("canonicalizes allowed URIs", () => {
+    expect(
+      normalizeExtensionRedirectUri("cursor://MarceloBarella.cursor-sync/auth/")
+    ).toBe("cursor://marcelobarella.cursor-sync/auth");
+  });
+});
+
+describe("resolveOAuthRedirectUriForHandoff", () => {
+  it("falls back to the default extension URI when query and storage are empty", () => {
+    expect(resolveOAuthRedirectUriForHandoff(null)).toBe(
+      "cursor://marcelobarella.cursor-sync/auth"
+    );
+  });
+
+  it("prefers a valid query redirect over the default", () => {
+    const vscodeUri = "vscode://MarceloBarella.cursor-sync/auth";
+    expect(resolveOAuthRedirectUri(vscodeUri)).toBe(
+      "vscode://marcelobarella.cursor-sync/auth"
+    );
+  });
+});
+
+describe("buildExtensionAuthRedirectUrl", () => {
+  it("appends encoded code and state query params", () => {
+    const url = buildExtensionAuthRedirectUrl(
+      EXTENSION_AUTH_URI,
+      "code+special/value",
+      "state with spaces"
+    );
+    const parsed = new URL(url);
+    expect(parsed.searchParams.get("code")).toBe("code+special/value");
+    expect(parsed.searchParams.get("state")).toBe("state with spaces");
+    expect(parsed.searchParams.has("token")).toBe(false);
+  });
+
+  it("passes state through unchanged", () => {
+    const url = buildExtensionAuthRedirectUrl(EXTENSION_AUTH_URI, "abc123", "opaque-state");
+    expect(url).toContain("state=opaque-state");
+    expect(url).toContain("code=abc123");
+  });
+
+  it("never puts a session token in the redirect URL", () => {
+    expect(() =>
+      buildExtensionAuthRedirectUrl(
+        `${EXTENSION_AUTH_URI}?token=leak`,
+        "abc",
+        null
+      )
+    ).toThrow(/token/);
+  });
+
+  it("rejects disallowed redirect URIs", () => {
+    expect(() =>
+      buildExtensionAuthRedirectUrl("https://evil.example/auth", "abc", null)
+    ).toThrow(/Invalid redirect URI/);
   });
 });
 

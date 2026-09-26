@@ -81,6 +81,26 @@
   color: var(--color-muted);
 }
 
+.auth-form-error-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.auth-form-error {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.43;
+  color: var(--color-ink);
+}
+
+.auth-form-error-muted {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--color-muted);
+}
+
 .auth-card-body {
   margin: 0;
   font-size: 1rem;
