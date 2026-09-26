@@ -39,10 +39,12 @@ function inferValidationCategory(
 ): AuthErrorCategory {
   if (body && typeof body === "object" && "error" in body) {
     const apiMessage = String((body as AuthError).error).toLowerCase();
-    if (apiMessage.includes("email")) {
+    const mentionsEmail = apiMessage.includes("email");
+    const mentionsPassword = apiMessage.includes("password");
+    if (mentionsEmail && !mentionsPassword) {
       return "validation_email";
     }
-    if (apiMessage.includes("password")) {
+    if (mentionsPassword && !mentionsEmail) {
       return "validation_password";
     }
   }
