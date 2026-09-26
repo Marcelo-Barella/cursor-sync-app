@@ -23,7 +23,7 @@ function requireApiBaseUrl(): string {
     );
   }
   const base = getApiBaseUrlForAuth();
-  if (!base) {
+  if (base === null) {
     throw new AuthApiError(
       "empty_api_base",
       messageForAuthErrorCategory("empty_api_base")
@@ -39,11 +39,11 @@ function inferValidationCategory(
 ): AuthErrorCategory {
   if (body && typeof body === "object" && "error" in body) {
     const apiMessage = String((body as AuthError).error).toLowerCase();
-    if (apiMessage.includes("email")) {
-      return "validation_email";
-    }
     if (apiMessage.includes("password")) {
       return "validation_password";
+    }
+    if (apiMessage.includes("email")) {
+      return "validation_email";
     }
   }
   if (!email.includes("@") || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {

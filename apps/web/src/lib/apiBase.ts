@@ -95,8 +95,10 @@ export function resolveApiBaseUrl(options: ResolveApiBaseOptions = {}): string {
     options.search ??
     (typeof window !== "undefined" ? window.location.search : "");
 
+  const allowClientOverride = !isProductionLikeMode(mode);
+
   const queryOverride = readQueryApiOverride(search);
-  if (queryOverride?.action === "set") {
+  if (allowClientOverride && queryOverride?.action === "set") {
     storage?.setItem(API_BASE_STORAGE_KEY, queryOverride.url);
     return queryOverride.url;
   }
@@ -104,7 +106,7 @@ export function resolveApiBaseUrl(options: ResolveApiBaseOptions = {}): string {
     storage?.removeItem(API_BASE_STORAGE_KEY);
   }
 
-  if (storage) {
+  if (allowClientOverride && storage) {
     const stored = storage.getItem(API_BASE_STORAGE_KEY);
     if (stored) {
       const normalized = normalizeApiBaseUrl(stored);
@@ -200,6 +202,9 @@ export function applyApiQueryParamFromLocation(): void {
   }
   const queryOverride = readQueryApiOverride(window.location.search);
   if (queryOverride?.action === "set") {
+    if (isProductionLikeMode()) {
+      return;
+    }
     localStorage.setItem(API_BASE_STORAGE_KEY, queryOverride.url);
     notifyApiBaseChanged();
     return;
