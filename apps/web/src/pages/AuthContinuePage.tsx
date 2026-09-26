@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { getMe, issueLoginCode } from "../lib/api";
+import { getMe, issueLoginCode, resendVerificationEmail } from "../lib/api";
 import {
   authPathWithOAuthQuery,
   clearToken,
@@ -25,6 +25,9 @@ export function AuthContinuePage() {
   const [token, setToken] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [handoffError, setHandoffError] = useState<string | null>(null);
+  const [emailVerified, setEmailVerified] = useState(true);
+  const [resendBusy, setResendBusy] = useState(false);
+  const [resendMessage, setResendMessage] = useState<string | null>(null);
   const handoffStarted = useRef(false);
 
   const queryRedirectUri = readRedirectUriFromSearchParams(searchParams);
@@ -44,8 +47,9 @@ export function AuthContinuePage() {
     }
 
     getMe(sessionToken)
-      .then(() => {
+      .then((me) => {
         setToken(sessionToken);
+        setEmailVerified(me.emailVerified !== false);
         const handoffTarget = resolveOAuthRedirectUriForHandoff(queryRedirectUri);
         if (!handoffTarget) {
           setState("invalid-link");
@@ -100,6 +104,32 @@ export function AuthContinuePage() {
   }, [state, busy, issueCodeAndGoToCallback]);
 
   const signInPath = authPathWithOAuthQuery("/sign-in", redirectUri, oauthState);
+
+  async function handleResendVerification() {
+    const sessionToken = token ?? readToken();
+    if (!sessionToken) {
+      return;
+    }
+    setResendBusy(true);
+    setResendMessage(null);
+    try {
+      const result = await resendVerificationEmail(sessionToken);
+      if (result.alreadyVerified) {
+        setEmailVerified(true);
+        setResendMessage("Your email is already verified.");
+      } else if (result.sent) {
+        setResendMessage("Verification email sent. Check your inbox.");
+      } else {
+        setResendMessage(
+          result.warning ?? "Could not send verification email. Try again later."
+        );
+      }
+    } catch {
+      setResendMessage("Could not send verification email. Try again later.");
+    } finally {
+      setResendBusy(false);
+    }
+  }
 
   if (state === "loading") {
     return (
@@ -158,6 +188,27 @@ export function AuthContinuePage() {
 
   return (
     <AuthLayout page="continue" showMarkInCard>
+      {!emailVerified ? (
+        <div className="auth-form-error-block" role="status">
+          <p className="auth-form-error-muted">
+            Verify your email address. We sent a link when you signed up.
+          </p>
+          {resendMessage ? (
+            <p className="auth-card-sub">{resendMessage}</p>
+          ) : null}
+          <Button
+            type="button"
+            variant="secondary"
+            fullWidth
+            loading={resendBusy}
+            onClick={() => {
+              void handleResendVerification();
+            }}
+          >
+            Resend verification email
+          </Button>
+        </div>
+      ) : null}
       <div className="auth-card-header">
         <h1 className="auth-card-title">Continue in Cursor</h1>
         <p className="auth-card-body">

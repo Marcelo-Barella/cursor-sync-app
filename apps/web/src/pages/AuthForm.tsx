@@ -157,7 +157,11 @@ export function AuthForm({ mode }: AuthFormProps) {
     <AuthLayout page={page}>
       <div className="auth-card-header">
         <h1 className="auth-card-title">{isSignUp ? "Create an account" : "Sign in"}</h1>
-        <p className="auth-card-sub">Opened from the Cursor Sync extension.</p>
+        <p className="auth-card-sub">
+          {isSignUp
+            ? "Opened from the Cursor Sync extension. We will email you a verification link after signup."
+            : "Opened from the Cursor Sync extension."}
+        </p>
       </div>
 
       <form className="auth-form" onSubmit={handleSubmit} noValidate>
