@@ -226,7 +226,7 @@ export async function issueLoginCode(
   }
 
   const base = requireApiBaseUrl();
-  const response = await fetch(`${base}/login/code`, {
+  const response = await fetch(`${base}/auth/login/code`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

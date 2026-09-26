@@ -16,7 +16,14 @@ import {
 import { AuthLayout } from "../components/AuthLayout";
 import { Button } from "../components/Button";
 
-type CallbackView = "loading" | "return" | "missed" | "empty" | "error" | "invalid-link";
+type CallbackView =
+  | "loading"
+  | "return"
+  | "missed"
+  | "empty"
+  | "error"
+  | "code-error"
+  | "invalid-link";
 
 const HANDOFF_TIMEOUT_MS = 2500;
 
@@ -59,6 +66,7 @@ export function AuthCallbackPage() {
           targetRedirectUri,
           targetState
         );
+        setView("return");
         attemptExtensionHandoff(
           targetRedirectUri,
           issued.code,
@@ -71,7 +79,7 @@ export function AuthCallbackPage() {
           }
         }, HANDOFF_TIMEOUT_MS);
       } catch {
-        setView("error");
+        setView("code-error");
       } finally {
         setBusy(false);
       }
@@ -169,6 +177,20 @@ export function AuthCallbackPage() {
             Sign in again
           </Button>
         </Link>
+      </AuthLayout>
+    );
+  }
+
+  if (view === "code-error") {
+    return (
+      <AuthLayout page="callback" showMarkInCard>
+        <div className="auth-card-header">
+          <h1 className="auth-card-title">Return to Cursor</h1>
+          <p className="auth-card-sub">Could not issue a sign-in code. Try again.</p>
+        </div>
+        <Button variant="primary" fullWidth loading={busy} onClick={handleTryAgain}>
+          Try again
+        </Button>
       </AuthLayout>
     );
   }

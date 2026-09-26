@@ -2,13 +2,19 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { pool } from "../db/pool.js";
 import { hashPassword, verifyLoginPassword } from "../lib/password.js";
-import { exchangeLoginCode } from "../lib/login-codes.js";
+import { createLoginCode, exchangeLoginCode } from "../lib/login-codes.js";
+import { isAllowedRedirectUri } from "../lib/redirect-uri.js";
 import { createSessionToken } from "../lib/session.js";
 import { requireAuth, type AuthVariables } from "../middleware/auth.js";
 
 const authSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
+});
+
+const issueLoginCodeSchema = z.object({
+  redirect_uri: z.string().min(1),
+  state: z.string().optional(),
 });
 
 export const authRoutes = new Hono<{ Variables: AuthVariables }>();
@@ -87,6 +93,27 @@ authRoutes.post("/login", async (c) => {
 
   const token = createSessionToken(user.id, user.email);
   return c.json({ token });
+});
+
+authRoutes.post("/login/code", requireAuth, async (c) => {
+  const body = await c.req.json().catch(() => null);
+  const parsed = issueLoginCodeSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ error: "Invalid request" }, 400);
+  }
+
+  const { redirect_uri, state } = parsed.data;
+  if (!isAllowedRedirectUri(redirect_uri)) {
+    return c.json({ error: "Invalid request" }, 400);
+  }
+
+  const userId = c.get("userId");
+  const code = await createLoginCode(userId);
+  return c.json({
+    code,
+    redirect_uri,
+    ...(state !== undefined ? { state } : {}),
+  });
 });
 
 authRoutes.post("/token", async (c) => {
