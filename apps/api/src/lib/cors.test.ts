@@ -14,16 +14,19 @@ afterEach(() => {
 
 test("reflects request origin when allowlist env is unset", () => {
   delete process.env.CORS_ALLOWED_ORIGINS;
-  assert.equal(resolveCorsOrigin("https://staging.sync.bergamota.dev"), "https://staging.sync.bergamota.dev");
+  assert.equal(
+    resolveCorsOrigin("https://staging.cursor-sync.com"),
+    "https://staging.cursor-sync.com"
+  );
   assert.equal(resolveCorsOrigin(undefined), "*");
 });
 
 test("allows only configured origins when allowlist env is set", () => {
   process.env.CORS_ALLOWED_ORIGINS =
-    "https://staging.sync.bergamota.dev,http://localhost:3000";
+    "https://staging.cursor-sync.com,http://localhost:3000";
   assert.equal(
-    resolveCorsOrigin("https://staging.sync.bergamota.dev"),
-    "https://staging.sync.bergamota.dev"
+    resolveCorsOrigin("https://staging.cursor-sync.com"),
+    "https://staging.cursor-sync.com"
   );
   assert.equal(resolveCorsOrigin("https://evil.example"), null);
 });

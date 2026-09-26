@@ -1,14 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   API_BASE_STORAGE_KEY,
-  STAGING_API_BASE_URL,
   defaultApiBaseForMode,
   normalizeApiBaseUrl,
   readQueryApiOverride,
   resolveApiBaseUrl,
   setStoredApiOverride,
 } from "./apiBase";
-import { CURSOR_SYNC_STAGING_API_BASE_URL } from "./defaults";
+import { DEFAULT_LOCAL_API_BASE_URL } from "./defaults";
 
 function createMemoryStorage(): Storage {
   const map = new Map<string, string>();
@@ -67,20 +66,22 @@ describe("resolveApiBaseUrl", () => {
     expect(normalizeApiBaseUrl(url)).toBeNull();
   });
 
-  it("uses the staging default when nothing else is set in staging mode", () => {
+  it("does not invent a staging API host when build-time URL is missing", () => {
     const storage = createMemoryStorage();
-    expect(
-      resolveApiBaseUrl({ storage, search: "", buildTimeUrl: "", mode: "staging" })
-    ).toBe(STAGING_API_BASE_URL);
+    const url = resolveApiBaseUrl({
+      storage,
+      search: "",
+      buildTimeUrl: "",
+      mode: "staging",
+    });
+    expect(url).toBe("");
+    expect(normalizeApiBaseUrl(url)).toBeNull();
   });
 
-  it("uses cursor-sync.com staging API when hostname matches", () => {
-    expect(
-      defaultApiBaseForMode("staging", "staging.cursor-sync.com")
-    ).toBe(CURSOR_SYNC_STAGING_API_BASE_URL);
-    expect(defaultApiBaseForMode("staging", "staging.sync.bergamota.dev")).toBe(
-      STAGING_API_BASE_URL
-    );
+  it("uses localhost only in development when nothing else is set", () => {
+    expect(defaultApiBaseForMode("development")).toBe(DEFAULT_LOCAL_API_BASE_URL);
+    expect(defaultApiBaseForMode("production")).toBe("");
+    expect(defaultApiBaseForMode("staging")).toBe("");
   });
 
   it("never returns an empty string as a usable auth API base in production-like modes", () => {
@@ -89,15 +90,10 @@ describe("resolveApiBaseUrl", () => {
       const url = resolveApiBaseUrl({
         storage,
         search: "",
-        buildTimeUrl: mode === "production" ? "" : "https://api-staging.example.com",
+        buildTimeUrl: "",
         mode,
       });
-      const authBase = normalizeApiBaseUrl(url);
-      if (mode === "production" && !url) {
-        expect(authBase).toBeNull();
-      } else {
-        expect(authBase).not.toBeNull();
-      }
+      expect(normalizeApiBaseUrl(url)).toBeNull();
     }
   });
 
