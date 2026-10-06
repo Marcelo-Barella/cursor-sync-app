@@ -1,5 +1,6 @@
-import type { IncomingMessage } from "node:http";
+import type { Context } from "hono";
 import { Hono } from "hono";
+import { remoteAddressFromHonoContext } from "../lib/hono-remote-address.js";
 import { pool } from "../db/pool.js";
 import { classifyKeyMaterialUpdateFailure } from "../lib/key-material-update.js";
 import {
@@ -34,10 +35,11 @@ type KeyRow = {
   dek_verifier: string;
 };
 
-function requestClientIp(c: { req: { raw: Request; header: (name: string) => string | undefined } }): string | null {
-  const incoming = c.req.raw as unknown as IncomingMessage;
-  const remoteAddress = incoming.socket?.remoteAddress ?? null;
-  return resolveKeyFetchClientIp(c.req.header("x-forwarded-for"), remoteAddress);
+function requestClientIp(c: Context): string | null {
+  return resolveKeyFetchClientIp(
+    c.req.header("x-forwarded-for"),
+    remoteAddressFromHonoContext(c)
+  );
 }
 
 function keyMaterialJsonError(

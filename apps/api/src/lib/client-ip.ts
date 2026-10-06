@@ -23,16 +23,20 @@ export function normalizeIpAddress(value: string | null | undefined): string | n
   return isIP(ip) ? ip : null;
 }
 
+/**
+ * Express-compatible trusted proxy hop selection: client is parts[length - hops]
+ * when the XFF chain has at least `hops` entries; otherwise use the socket peer.
+ */
 export function clientIpFromForwarded(
   xForwardedFor: string | null | undefined,
   remoteAddress: string | null | undefined,
   hops = trustedProxyHops()
 ): string | null {
   const xff = xForwardedFor?.trim();
-  if (xff) {
+  if (xff && hops >= 1) {
     const parts = xff.split(",").map((part) => part.trim()).filter(Boolean);
-    const index = parts.length - 1 - hops;
-    if (index >= 0 && index < parts.length) {
+    if (parts.length >= hops) {
+      const index = parts.length - hops;
       const fromHeader = normalizeIpAddress(parts[index]);
       if (fromHeader) {
         return fromHeader;
