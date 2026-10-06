@@ -1,7 +1,9 @@
 import {
+  CURSOR_SYNC_STAGING_API_BASE_URL,
   DEFAULT_LOCAL_API_BASE_URL,
   DEFAULT_PRODUCTION_API_BASE_URL,
   DEFAULT_STAGING_API_BASE_URL,
+  isCursorSyncStagingHost,
 } from "./defaults";
 import { messageForAuthErrorCategory } from "./authErrors";
 
@@ -12,8 +14,17 @@ export const LOCAL_API_PRESET = DEFAULT_LOCAL_API_BASE_URL;
 
 export const API_BASE_CHANGED_EVENT = "cursor-sync-api-base-changed";
 
-export function defaultApiBaseForMode(mode: string = import.meta.env.MODE): string {
+export function defaultApiBaseForMode(
+  mode: string = import.meta.env.MODE,
+  hostname?: string
+): string {
   if (mode === "staging") {
+    const host =
+      hostname ??
+      (typeof window !== "undefined" ? window.location.hostname : "");
+    if (host && isCursorSyncStagingHost(host)) {
+      return CURSOR_SYNC_STAGING_API_BASE_URL;
+    }
     return STAGING_API_BASE_URL;
   }
   if (mode === "development") {
