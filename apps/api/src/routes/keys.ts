@@ -13,12 +13,12 @@ import {
   rowToKeyResponse,
   setupBodySchema,
 } from "../lib/key-material.js";
+import { clientIpFromForwarded } from "../lib/client-ip.js";
 import {
   KEY_FETCH_STATUS,
   auditLogKeyFetch,
   checkKeyFetchRateLimit,
   recordKeyFetchAudit,
-  resolveKeyFetchClientIp,
 } from "../lib/keys-rate-limit.js";
 import { requireAuth, type AuthVariables } from "../middleware/auth.js";
 import { requireEmailVerified } from "../middleware/require-email-verified.js";
@@ -36,7 +36,7 @@ type KeyRow = {
 };
 
 function requestClientIp(c: Context): string | null {
-  return resolveKeyFetchClientIp(
+  return clientIpFromForwarded(
     c.req.header("x-forwarded-for"),
     remoteAddressFromHonoContext(c)
   );

@@ -1,5 +1,4 @@
 import type { Pool } from "pg";
-import { clientIpFromForwarded } from "./client-ip.js";
 
 const WINDOW_MS = 15 * 60 * 1000;
 
@@ -19,13 +18,6 @@ function limitPerIp(): number {
   const raw = process.env.KEY_FETCH_LIMIT_PER_IP;
   const n = raw ? Number.parseInt(raw, 10) : 30;
   return Number.isFinite(n) && n > 0 ? n : 30;
-}
-
-export function resolveKeyFetchClientIp(
-  xForwardedFor: string | null | undefined,
-  remoteAddress: string | null | undefined
-): string | null {
-  return clientIpFromForwarded(xForwardedFor, remoteAddress);
 }
 
 export type KeyFetchRateLimitResult =
