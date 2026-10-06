@@ -12,10 +12,11 @@ import {
   dekVerifiersMatch,
 } from "../lib/key-material.js";
 import {
+  KEY_FETCH_STATUS,
   auditLogKeyFetch,
   checkKeyFetchRateLimit,
   clientIpFromRequest,
-  recordKeyFetchEvent,
+  recordKeyFetchAudit,
 } from "../lib/keys-rate-limit.js";
 import { requireAuth, type AuthVariables } from "../middleware/auth.js";
 import { requireEmailVerified } from "../middleware/require-email-verified.js";
@@ -42,6 +43,8 @@ keysRoutes.get("/", async (c) => {
 
   const rate = await checkKeyFetchRateLimit(pool, userId, ip);
   if (!rate.allowed) {
+    await recordKeyFetchAudit(pool, userId, ip, KEY_FETCH_STATUS.RATE_LIMITED);
+    auditLogKeyFetch(userId, ip, KEY_FETCH_STATUS.RATE_LIMITED);
     c.header("Retry-After", String(rate.retryAfterSeconds));
     return c.json({ error: "RATE_LIMITED" }, 429);
   }
@@ -56,13 +59,13 @@ keysRoutes.get("/", async (c) => {
 
   const row = result.rows[0];
   if (!row) {
-    await recordKeyFetchEvent(pool, userId, ip);
-    auditLogKeyFetch(userId, ip);
+    await recordKeyFetchAudit(pool, userId, ip, KEY_FETCH_STATUS.NOT_SET);
+    auditLogKeyFetch(userId, ip, KEY_FETCH_STATUS.NOT_SET);
     return c.json({ error: "KEYS_NOT_SET" }, 404);
   }
 
-  await recordKeyFetchEvent(pool, userId, ip);
-  auditLogKeyFetch(userId, ip);
+  await recordKeyFetchAudit(pool, userId, ip, KEY_FETCH_STATUS.OK);
+  auditLogKeyFetch(userId, ip, KEY_FETCH_STATUS.OK);
 
   return c.json(rowToKeyResponse(row));
 });
@@ -102,7 +105,7 @@ keysRoutes.put("/", async (c) => {
       userId,
       material.keyVersion,
       material.kdf,
-      JSON.stringify(material.kdfParams),
+      material.kdfParams,
       material.salt,
       material.passWrap.nonce,
       material.passWrap.ct,
@@ -170,7 +173,7 @@ keysRoutes.post("/rewrap", async (c) => {
      WHERE user_id = $1`,
     [
       userId,
-      JSON.stringify(material.kdfParams),
+      material.kdfParams,
       material.salt,
       material.passWrap.nonce,
       material.passWrap.ct,

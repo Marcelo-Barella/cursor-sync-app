@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { after, before, describe, it } from "node:test";
+import { minimalCse1EnvelopeForTests } from "../lib/cse1-manifest.js";
 import { pool } from "../db/pool.js";
 import { hashPassword } from "../lib/password.js";
 import { createSessionToken } from "../lib/session.js";
@@ -31,8 +32,8 @@ describe("configs encrypted manifest", { skip: !databaseUrl }, () => {
     }
   });
 
-  it("stores opaque encrypted manifest with etag concurrency", async () => {
-    const manifest = Buffer.from("opaque-cse1-blob").toString("base64");
+  it("stores raw CSE1 manifest bytes with manifest_version concurrency", async () => {
+    const manifest = minimalCse1EnvelopeForTests().toString("base64");
 
     const first = await app.request("/configs", {
       method: "PUT",
@@ -41,20 +42,20 @@ describe("configs encrypted manifest", { skip: !databaseUrl }, () => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        encryptedManifest: manifest,
-        expectedManifestEtag: null,
+        manifestCiphertext: manifest,
+        expectedManifestVersion: 0,
         clearLegacyPayload: true,
       }),
     });
     assert.equal(first.status, 200);
     const firstBody = (await first.json()) as {
-      encryptedManifest: string;
-      manifestEtag: string;
+      manifestCiphertext: string;
+      manifestVersion: number;
       payload: Record<string, unknown>;
     };
     assert.deepEqual(firstBody.payload, {});
-    assert.ok(firstBody.manifestEtag);
-    assert.equal(firstBody.encryptedManifest, manifest);
+    assert.equal(firstBody.manifestVersion, 1);
+    assert.equal(firstBody.manifestCiphertext, manifest);
 
     const conflict = await app.request("/configs", {
       method: "PUT",
@@ -63,11 +64,16 @@ describe("configs encrypted manifest", { skip: !databaseUrl }, () => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        encryptedManifest: manifest,
-        expectedManifestEtag: null,
+        manifestCiphertext: manifest,
+        expectedManifestVersion: 0,
       }),
     });
     assert.equal(conflict.status, 409);
+
+    const nextManifest = Buffer.concat([
+      minimalCse1EnvelopeForTests(),
+      Buffer.from([1]),
+    ]).toString("base64");
 
     const second = await app.request("/configs", {
       method: "PUT",
@@ -76,13 +82,29 @@ describe("configs encrypted manifest", { skip: !databaseUrl }, () => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        encryptedManifest: Buffer.from("next-blob").toString("base64"),
-        expectedManifestEtag: firstBody.manifestEtag,
+        manifestCiphertext: nextManifest,
+        expectedManifestVersion: 1,
       }),
     });
     assert.equal(second.status, 200);
-    const secondBody = (await second.json()) as { manifestEtag: string };
-    assert.notEqual(secondBody.manifestEtag, firstBody.manifestEtag);
+    const secondBody = (await second.json()) as { manifestVersion: number };
+    assert.equal(secondBody.manifestVersion, 2);
+  });
+
+  it("rejects invalid manifest magic at the API edge", async () => {
+    const bad = Buffer.alloc(36, 0).toString("base64");
+    const response = await app.request("/configs", {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        manifestCiphertext: bad,
+        expectedManifestVersion: 2,
+      }),
+    });
+    assert.equal(response.status, 400);
   });
 
   it("still accepts legacy plaintext payload updates", async () => {

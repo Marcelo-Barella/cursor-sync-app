@@ -1,13 +1,14 @@
 import { timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 
-export const SALT_BYTES = 16;
+export const MIN_SALT_BYTES = 16;
 export const NONCE_BYTES = 12;
-export const WRAPPED_DEK_BYTES = 48;
 export const DEK_VERIFIER_HEX_LENGTH = 64;
 
 const MIN_ARGON_M = 16 * 1024 * 1024;
 const MAX_ARGON_M = 256 * 1024 * 1024;
+
+const lowercaseHex64 = /^[0-9a-f]{64}$/;
 
 export const kdfParamsSchema = z.object({
   m: z.number().int().min(MIN_ARGON_M).max(MAX_ARGON_M),
@@ -27,12 +28,12 @@ export const setupBodySchema = z.object({
   salt: z.string().min(1),
   passWrap: wrapSchema,
   recoveryWrap: wrapSchema,
-  dekVerifier: z.string().length(DEK_VERIFIER_HEX_LENGTH).regex(/^[0-9a-f]+$/i),
+  dekVerifier: z.string().regex(lowercaseHex64),
 });
 
 export const rewrapBodySchema = z.object({
   keyVersion: z.number().int().min(1),
-  dekVerifier: z.string().length(DEK_VERIFIER_HEX_LENGTH).regex(/^[0-9a-f]+$/i),
+  dekVerifier: z.string().regex(lowercaseHex64),
   kdfParams: kdfParamsSchema,
   salt: z.string().min(1),
   passWrap: wrapSchema,
@@ -40,7 +41,7 @@ export const rewrapBodySchema = z.object({
 
 export const recoveryBodySchema = z.object({
   keyVersion: z.number().int().min(1),
-  dekVerifier: z.string().length(DEK_VERIFIER_HEX_LENGTH).regex(/^[0-9a-f]+$/i),
+  dekVerifier: z.string().regex(lowercaseHex64),
   recoveryWrap: wrapSchema,
 });
 
@@ -59,16 +60,37 @@ export type ParsedSetup = {
   dekVerifier: string;
 };
 
-function decodeBase64Field(value: string, expectedBytes: number, field: string): Buffer {
-  let buf: Buffer;
+function decodeBase64(value: string, field: string): Buffer {
   try {
-    buf = Buffer.from(value, "base64");
+    return Buffer.from(value, "base64");
   } catch {
     throw new KeyMaterialValidationError(`Invalid base64 for ${field}`);
   }
-  if (buf.length !== expectedBytes) {
+}
+
+function decodeNonce(value: string, field: string): Buffer {
+  const buf = decodeBase64(value, field);
+  if (buf.length !== NONCE_BYTES) {
     throw new KeyMaterialValidationError(
-      `Invalid length for ${field}: expected ${expectedBytes} bytes`
+      `Invalid length for ${field}: expected ${NONCE_BYTES} bytes`
+    );
+  }
+  return buf;
+}
+
+function decodeWrapCt(value: string, field: string): Buffer {
+  const buf = decodeBase64(value, field);
+  if (buf.length === 0) {
+    throw new KeyMaterialValidationError(`Invalid length for ${field}: wrap must be non-empty`);
+  }
+  return buf;
+}
+
+function decodeSalt(value: string): Buffer {
+  const buf = decodeBase64(value, "salt");
+  if (buf.length < MIN_SALT_BYTES) {
+    throw new KeyMaterialValidationError(
+      `Invalid length for salt: expected at least ${MIN_SALT_BYTES} bytes`
     );
   }
   return buf;
@@ -83,8 +105,8 @@ export class KeyMaterialValidationError extends Error {
 
 function parseWrap(wrap: z.infer<typeof wrapSchema>, label: string): ParsedWrap {
   return {
-    nonce: decodeBase64Field(wrap.nonce, NONCE_BYTES, `${label}.nonce`),
-    ct: decodeBase64Field(wrap.ct, WRAPPED_DEK_BYTES, `${label}.ct`),
+    nonce: decodeNonce(wrap.nonce, `${label}.nonce`),
+    ct: decodeWrapCt(wrap.ct, `${label}.ct`),
   };
 }
 
@@ -93,19 +115,19 @@ export function parseSetupBody(body: z.infer<typeof setupBodySchema>): ParsedSet
     keyVersion: body.keyVersion,
     kdf: body.kdf,
     kdfParams: body.kdfParams,
-    salt: decodeBase64Field(body.salt, SALT_BYTES, "salt"),
+    salt: decodeSalt(body.salt),
     passWrap: parseWrap(body.passWrap, "passWrap"),
     recoveryWrap: parseWrap(body.recoveryWrap, "recoveryWrap"),
-    dekVerifier: body.dekVerifier.toLowerCase(),
+    dekVerifier: body.dekVerifier,
   };
 }
 
 export function parseRewrapBody(body: z.infer<typeof rewrapBodySchema>) {
   return {
     keyVersion: body.keyVersion,
-    dekVerifier: body.dekVerifier.toLowerCase(),
+    dekVerifier: body.dekVerifier,
     kdfParams: body.kdfParams,
-    salt: decodeBase64Field(body.salt, SALT_BYTES, "salt"),
+    salt: decodeSalt(body.salt),
     passWrap: parseWrap(body.passWrap, "passWrap"),
   };
 }
@@ -113,14 +135,14 @@ export function parseRewrapBody(body: z.infer<typeof rewrapBodySchema>) {
 export function parseRecoveryBody(body: z.infer<typeof recoveryBodySchema>) {
   return {
     keyVersion: body.keyVersion,
-    dekVerifier: body.dekVerifier.toLowerCase(),
+    dekVerifier: body.dekVerifier,
     recoveryWrap: parseWrap(body.recoveryWrap, "recoveryWrap"),
   };
 }
 
 export function dekVerifiersMatch(stored: string, provided: string): boolean {
-  const a = Buffer.from(stored.toLowerCase(), "utf8");
-  const b = Buffer.from(provided.toLowerCase(), "utf8");
+  const a = Buffer.from(stored, "utf8");
+  const b = Buffer.from(provided, "utf8");
   if (a.length !== b.length) {
     return false;
   }

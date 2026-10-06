@@ -5,10 +5,11 @@ import { pool } from "../db/pool.js";
 import { hashPassword } from "../lib/password.js";
 import {
   DEK_VERIFIER_HEX_LENGTH,
+  MIN_SALT_BYTES,
   NONCE_BYTES,
-  SALT_BYTES,
-  WRAPPED_DEK_BYTES,
 } from "../lib/key-material.js";
+
+const WRAPPED_DEK_BYTES = 48;
 import { createSessionToken } from "../lib/session.js";
 import { app } from "../test/app.js";
 
@@ -24,7 +25,7 @@ function validSetupBody(overrides: Record<string, unknown> = {}) {
     keyVersion: 1,
     kdf: "argon2id",
     kdfParams: { m: 64 * 1024 * 1024, t: 3, p: 1 },
-    salt: b64(SALT_BYTES),
+    salt: b64(MIN_SALT_BYTES),
     passWrap: { nonce: b64(NONCE_BYTES), ct: b64(WRAPPED_DEK_BYTES) },
     recoveryWrap: { nonce: b64(NONCE_BYTES), ct: b64(WRAPPED_DEK_BYTES) },
     dekVerifier,
@@ -166,7 +167,7 @@ describe("v1 keys API", { skip: !databaseUrl }, () => {
         keyVersion: 99,
         dekVerifier: "c".repeat(DEK_VERIFIER_HEX_LENGTH),
         kdfParams: { m: 64 * 1024 * 1024, t: 3, p: 1 },
-        salt: b64(SALT_BYTES),
+        salt: b64(MIN_SALT_BYTES),
         passWrap: { nonce: b64(NONCE_BYTES), ct: b64(WRAPPED_DEK_BYTES) },
       }),
     });
@@ -182,7 +183,7 @@ describe("v1 keys API", { skip: !databaseUrl }, () => {
         keyVersion: 1,
         dekVerifier: "d".repeat(DEK_VERIFIER_HEX_LENGTH),
         kdfParams: { m: 64 * 1024 * 1024, t: 3, p: 1 },
-        salt: b64(SALT_BYTES),
+        salt: b64(MIN_SALT_BYTES),
         passWrap: { nonce: b64(NONCE_BYTES), ct: b64(WRAPPED_DEK_BYTES) },
       }),
     });
@@ -198,7 +199,7 @@ describe("v1 keys API", { skip: !databaseUrl }, () => {
         keyVersion: 1,
         dekVerifier: "c".repeat(DEK_VERIFIER_HEX_LENGTH),
         kdfParams: { m: 64 * 1024 * 1024, t: 3, p: 1 },
-        salt: b64(SALT_BYTES),
+        salt: b64(MIN_SALT_BYTES),
         passWrap: { nonce: b64(NONCE_BYTES), ct: b64(48) },
       }),
     });
