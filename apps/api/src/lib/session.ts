@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import jwt from "jsonwebtoken";
 
 const JWT_EXPIRY = "7d";
@@ -32,7 +33,7 @@ function getSecret(): string {
 }
 
 export function createSessionToken(userId: string, email: string): string {
-  return jwt.sign({ sub: userId, email }, getSecret(), {
+  return jwt.sign({ sub: userId, email, jti: randomUUID() }, getSecret(), {
     expiresIn: JWT_EXPIRY,
   });
 }
