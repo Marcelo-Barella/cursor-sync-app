@@ -32,14 +32,13 @@ export async function revokeSessionTokenIfValid(rawToken: string): Promise<void>
      ON CONFLICT (token_hash) DO NOTHING`,
     [tokenHash, payload.sub, expiresAt]
   );
+  await pool.query(`DELETE FROM revoked_session_tokens WHERE expires_at < now()`);
 }
 
 export async function isSessionTokenRevoked(rawToken: string): Promise<boolean> {
   const tokenHash = hashSessionToken(rawToken);
   const result = await pool.query(
-    `SELECT 1 FROM revoked_session_tokens
-     WHERE token_hash = $1 AND expires_at > now()
-     LIMIT 1`,
+    `SELECT 1 FROM revoked_session_tokens WHERE token_hash = $1 LIMIT 1`,
     [tokenHash]
   );
   return (result.rowCount ?? 0) > 0;
