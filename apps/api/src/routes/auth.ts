@@ -11,7 +11,11 @@ import {
   canResendVerification,
   markVerificationResent,
 } from "../lib/resend-rate-limit.js";
-import { createSessionToken, verifySessionToken } from "../lib/session.js";
+import {
+  revokeSessionTokenIfValid,
+  verifyActiveSessionToken,
+} from "../lib/session-revocation.js";
+import { createSessionToken } from "../lib/session.js";
 import { issueAndSendVerificationEmail } from "../lib/verification-email.js";
 import { requireAuth, type AuthVariables } from "../middleware/auth.js";
 
@@ -55,6 +59,34 @@ function sessionJson(
 }
 
 export const authRoutes = new Hono<{ Variables: AuthVariables }>();
+
+function bearerTokenFromRequest(c: {
+  req: { header: (name: string) => string | undefined };
+}): string | null {
+  const header = c.req.header("Authorization");
+  if (!header?.startsWith("Bearer ")) {
+    return null;
+  }
+  const token = header.slice("Bearer ".length);
+  return token.length > 0 ? token : null;
+}
+
+const logoutHandler = async (c: {
+  req: { header: (name: string) => string | undefined };
+  json: (body: unknown, status?: number) => Response;
+  body: (data: null, status: number) => Response;
+}) => {
+  const token = bearerTokenFromRequest(c);
+  if (!token) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  await revokeSessionTokenIfValid(token);
+  return c.body(null, 204);
+};
+
+authRoutes.post("/logout", logoutHandler);
+authRoutes.post("/session-revoke", logoutHandler);
 
 authRoutes.post("/signup", async (c) => {
   const body = await c.req.json().catch(() => null);
@@ -196,10 +228,10 @@ authRoutes.post("/resend-verification", async (c) => {
   let userId: string | null = null;
   let userEmail: string | null = null;
 
-  const header = c.req.header("Authorization");
-  if (header?.startsWith("Bearer ")) {
+  const sessionToken = bearerTokenFromRequest(c);
+  if (sessionToken) {
     try {
-      const payload = verifySessionToken(header.slice("Bearer ".length));
+      const payload = await verifyActiveSessionToken(sessionToken);
       userId = payload.sub;
       userEmail = payload.email;
     } catch {
