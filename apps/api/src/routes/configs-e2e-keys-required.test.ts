@@ -113,13 +113,26 @@ describe("configs E2E_REQUIRED after keys set", { skip: !databaseUrl }, () => {
   it("includes legacyPlaintextObjectKeys on GET when keys exist", async () => {
     await pool.query(
       `UPDATE configs SET payload = $2 WHERE user_id = $1`,
-      [userId, { paths: { "chats/x.json": {} } }]
+      [
+        userId,
+        {
+          schemaVersion: 1,
+          profile: "default",
+          files: {
+            "cursor-user/settings.json": { size: 1 },
+            "chats/x.json": { size: 2 },
+          },
+        },
+      ]
     );
     const response = await app.request("/configs", {
       headers: { Authorization: `Bearer ${token}` },
     });
     assert.equal(response.status, 200);
     const body = (await response.json()) as { legacyPlaintextObjectKeys: string[] };
-    assert.deepEqual(body.legacyPlaintextObjectKeys, ["chats/x.json"]);
+    assert.deepEqual(body.legacyPlaintextObjectKeys, [
+      "chats/x.json",
+      "cursor-user/settings.json",
+    ]);
   });
 });

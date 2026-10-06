@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   filterPlaintextObjectKeys,
+  isCse1ObjectStorageKey,
   isRelativePlaintextObjectKey,
 } from "./plaintext-object-keys.js";
 
@@ -13,6 +14,7 @@ describe("plaintext object keys", () => {
 
   it("rejects hmac hex object keys", () => {
     const hmacKey = "a".repeat(64);
+    assert.equal(isCse1ObjectStorageKey(hmacKey), true);
     assert.equal(isRelativePlaintextObjectKey(hmacKey), false);
   });
 
