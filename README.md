@@ -114,7 +114,7 @@ Login passwords use argon2id only (`apps/api/src/lib/password.ts`). AES-256-GCM 
 
 ### Session model
 
-Auth uses **JWT bearer tokens** (7-day expiry). Revocation is tracked server-side: `POST /auth/logout` (or `POST /auth/session-revoke`) stores a SHA-256 hash of the bearer token in `revoked_session_tokens` until the JWT’s `exp`. After logout, protected routes return `401` for that token. Other sessions for the same user remain valid.
+Auth uses **JWT bearer tokens** (7-day expiry). Revocation is tracked server-side in `revoked_session_tokens` (`db/init/005_revoked_session_tokens.sql`). **DevOps must apply that script on staging Postgres before this branch merges or the API deploys.** `POST /auth/logout` (or `POST /auth/session-revoke`) stores a SHA-256 hash of the full bearer JWT (lowercase hex) until the JWT’s `exp`; each logout also deletes rows with `expires_at < now()`. After logout, protected routes return `401` for that token. Other sessions for the same user remain valid.
 
 Short-lived R2 credentials already minted via `POST /v1/storage/credentials` remain usable until their own TTL; logout does not revoke them.
 
