@@ -1,0 +1,70 @@
+.app-shell {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-ground);
+}
+
+.app-shell-header {
+  border-bottom: 1px solid var(--color-line);
+  background: var(--color-surface);
+}
+
+.app-shell-header-inner {
+  max-width: var(--max-content);
+  margin: 0 auto;
+  padding: var(--space-3);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.app-shell-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  text-decoration: none;
+  color: inherit;
+}
+
+.app-shell-brand-name {
+  font-family: var(--font-display);
+  font-size: 0.9375rem;
+  font-weight: 500;
+}
+
+.app-shell-tabs {
+  display: inline-flex;
+  gap: var(--space-1);
+  padding: 2px;
+  border-radius: 999px;
+  border: 1px solid var(--color-line);
+  background: var(--color-ground);
+}
+
+.app-shell-tab {
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 0.8125rem;
+  text-decoration: none;
+  color: var(--color-muted);
+}
+
+.app-shell-tab-active {
+  background: var(--color-surface);
+  color: var(--color-ink);
+  border: 1px solid var(--color-line);
+}
+
+.app-shell-main {
+  flex: 1;
+  padding: var(--space-6) var(--space-3);
+}
+
+.app-loading {
+  min-height: 40vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
