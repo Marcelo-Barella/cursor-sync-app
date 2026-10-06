@@ -1,4 +1,5 @@
 import type { Pool } from "pg";
+import { clientIpFromForwarded } from "./client-ip.js";
 
 const WINDOW_MS = 15 * 60 * 1000;
 
@@ -20,24 +21,18 @@ function limitPerIp(): number {
   return Number.isFinite(n) && n > 0 ? n : 30;
 }
 
-export function clientIpFromRequest(headers: Headers): string | null {
-  const forwarded = headers.get("x-forwarded-for");
-  if (forwarded) {
-    const first = forwarded.split(",")[0]?.trim();
-    if (first) {
-      return first;
-    }
-  }
-  const realIp = headers.get("x-real-ip")?.trim();
-  if (realIp) {
-    return realIp;
-  }
-  return null;
+export function resolveKeyFetchClientIp(
+  xForwardedFor: string | null | undefined,
+  remoteAddress: string | null | undefined
+): string | null {
+  return clientIpFromForwarded(xForwardedFor, remoteAddress);
 }
 
 export type KeyFetchRateLimitResult =
   | { allowed: true }
   | { allowed: false; retryAfterSeconds: number };
+
+const EXCLUDE_429 = `status <> ${KEY_FETCH_STATUS.RATE_LIMITED}`;
 
 export async function checkKeyFetchRateLimit(
   pool: Pool,
@@ -49,34 +44,69 @@ export async function checkKeyFetchRateLimit(
   const userLimit = limitPerUser();
   const ipLimit = limitPerIp();
 
-  const counts = await pool.query<{ user_count: string; ip_count: string }>(
-    `SELECT
-       (SELECT count(*)::text FROM key_fetch_audit
-        WHERE user_id = $1 AND fetched_at > $2) AS user_count,
-       (SELECT count(*)::text FROM key_fetch_audit
-        WHERE ip IS NOT DISTINCT FROM $3::inet AND fetched_at > $2) AS ip_count`,
-    [userId, since, ip]
+  const userCountResult = await pool.query<{ user_count: string }>(
+    `SELECT count(*)::text AS user_count FROM key_fetch_audit
+     WHERE user_id = $1 AND fetched_at > $2 AND ${EXCLUDE_429}`,
+    [userId, since]
   );
+  const userCount = Number.parseInt(userCountResult.rows[0]?.user_count ?? "0", 10);
 
-  const userCount = Number.parseInt(counts.rows[0]?.user_count ?? "0", 10);
-  const ipCount = Number.parseInt(counts.rows[0]?.ip_count ?? "0", 10);
-
-  if (userCount >= userLimit || (ip !== null && ipCount >= ipLimit)) {
-    const oldest = await pool.query<{ fetched_at: Date }>(
-      `SELECT fetched_at FROM key_fetch_audit
-       WHERE fetched_at > $3
-         AND (user_id = $1 OR (ip IS NOT DISTINCT FROM $2::inet))
-       ORDER BY fetched_at ASC
-       LIMIT 1`,
-      [userId, ip, since]
+  let ipCount = 0;
+  if (ip !== null) {
+    const ipCountResult = await pool.query<{ ip_count: string }>(
+      `SELECT count(*)::text AS ip_count FROM key_fetch_audit
+       WHERE ip = $2::inet AND fetched_at > $1 AND ${EXCLUDE_429}`,
+      [since, ip]
     );
-    const oldestAt = oldest.rows[0]?.fetched_at?.getTime() ?? now;
-    const retryAfterMs = Math.max(0, oldestAt + WINDOW_MS - now);
-    const retryAfterSeconds = Math.max(1, Math.ceil(retryAfterMs / 1000));
-    return { allowed: false, retryAfterSeconds };
+    ipCount = Number.parseInt(ipCountResult.rows[0]?.ip_count ?? "0", 10);
   }
 
-  return { allowed: true };
+  const userLimited = userCount >= userLimit;
+  const ipLimited = ip !== null && ipCount >= ipLimit;
+
+  if (!userLimited && !ipLimited) {
+    return { allowed: true };
+  }
+
+  const retryAfterSecondsCandidates: number[] = [];
+
+  if (userLimited) {
+    const oldestUser = await pool.query<{ fetched_at: Date }>(
+      `SELECT fetched_at FROM key_fetch_audit
+       WHERE user_id = $1 AND fetched_at > $2 AND ${EXCLUDE_429}
+       ORDER BY fetched_at ASC
+       LIMIT 1`,
+      [userId, since]
+    );
+    const t = oldestUser.rows[0]?.fetched_at?.getTime();
+    if (t !== undefined) {
+      retryAfterSecondsCandidates.push(
+        Math.max(1, Math.ceil((t + WINDOW_MS - now) / 1000))
+      );
+    }
+  }
+
+  if (ipLimited && ip !== null) {
+    const oldestIp = await pool.query<{ fetched_at: Date }>(
+      `SELECT fetched_at FROM key_fetch_audit
+       WHERE ip = $2::inet AND fetched_at > $1 AND ${EXCLUDE_429}
+       ORDER BY fetched_at ASC
+       LIMIT 1`,
+      [since, ip]
+    );
+    const t = oldestIp.rows[0]?.fetched_at?.getTime();
+    if (t !== undefined) {
+      retryAfterSecondsCandidates.push(
+        Math.max(1, Math.ceil((t + WINDOW_MS - now) / 1000))
+      );
+    }
+  }
+
+  const retryAfterSeconds =
+    retryAfterSecondsCandidates.length > 0
+      ? Math.max(...retryAfterSecondsCandidates)
+      : 1;
+  return { allowed: false, retryAfterSeconds };
 }
 
 export async function recordKeyFetchAudit(
@@ -85,6 +115,13 @@ export async function recordKeyFetchAudit(
   ip: string | null,
   status: number
 ): Promise<void> {
+  if (ip === null) {
+    await pool.query(
+      `INSERT INTO key_fetch_audit (user_id, ip, status) VALUES ($1, NULL, $2)`,
+      [userId, status]
+    );
+    return;
+  }
   await pool.query(
     `INSERT INTO key_fetch_audit (user_id, ip, status) VALUES ($1, $2::inet, $3)`,
     [userId, ip, status]

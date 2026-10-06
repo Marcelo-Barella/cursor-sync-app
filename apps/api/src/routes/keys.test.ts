@@ -248,6 +248,71 @@ describe("v1 keys API", { skip: !databaseUrl }, () => {
     assert.notEqual(afterBody.recoveryWrap.ct, beforeBody.recoveryWrap.ct);
   });
 
+  it("does not 500 on garbage X-Forwarded-For", async () => {
+    const response = await app.request("/v1/keys", {
+      headers: {
+        Authorization: `Bearer ${verifiedToken}`,
+        "X-Forwarded-For": "not-an-ip, also-bad",
+      },
+    });
+    assert.notEqual(response.status, 500);
+    assert.ok(response.status === 200 || response.status === 404);
+  });
+
+  it("does not count 429 audit rows toward the rate limit", async () => {
+    const email = `keys-429-excl-${randomUUID()}@example.com`;
+    const passwordHash = await hashPassword("password12345");
+    const insert = await pool.query<{ id: string }>(
+      `INSERT INTO users (email, password_hash, email_verified_at)
+       VALUES ($1, $2, now()) RETURNING id`,
+      [email, passwordHash]
+    );
+    const userId = insert.rows[0]!.id;
+    const token = createSessionToken(userId, email);
+
+    await pool.query(
+      `INSERT INTO key_fetch_audit (user_id, ip, status)
+       SELECT $1, NULL, 429 FROM generate_series(1, 25)`,
+      [userId]
+    );
+
+    const response = await app.request("/v1/keys", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    assert.equal(response.status, 404);
+
+    await pool.query(`DELETE FROM users WHERE id = $1`, [userId]);
+  });
+
+  it("handles concurrent PUT /v1/keys with one 201 and one 409", async () => {
+    const email = `keys-race-${randomUUID()}@example.com`;
+    const passwordHash = await hashPassword("password12345");
+    const insert = await pool.query<{ id: string }>(
+      `INSERT INTO users (email, password_hash, email_verified_at)
+       VALUES ($1, $2, now()) RETURNING id`,
+      [email, passwordHash]
+    );
+    const userId = insert.rows[0]!.id;
+    const token = createSessionToken(userId, email);
+    const setup = validSetupBody();
+
+    const put = () =>
+      app.request("/v1/keys", {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(setup),
+      });
+
+    const [first, second] = await Promise.all([put(), put()]);
+    const statuses = [first.status, second.status].sort((a, b) => a - b);
+    assert.deepEqual(statuses, [201, 409]);
+
+    await pool.query(`DELETE FROM users WHERE id = $1`, [userId]);
+  });
+
   it("rate limits GET /v1/keys", async () => {
     const rateUserEmail = `keys-rate-${randomUUID()}@example.com`;
     const passwordHash = await hashPassword("password12345");

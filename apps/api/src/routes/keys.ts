@@ -1,5 +1,7 @@
+import type { IncomingMessage } from "node:http";
 import { Hono } from "hono";
 import { pool } from "../db/pool.js";
+import { classifyKeyMaterialUpdateFailure } from "../lib/key-material-update.js";
 import {
   KeyMaterialValidationError,
   parseRecoveryBody,
@@ -9,14 +11,13 @@ import {
   rewrapBodySchema,
   rowToKeyResponse,
   setupBodySchema,
-  dekVerifiersMatch,
 } from "../lib/key-material.js";
 import {
   KEY_FETCH_STATUS,
   auditLogKeyFetch,
   checkKeyFetchRateLimit,
-  clientIpFromRequest,
   recordKeyFetchAudit,
+  resolveKeyFetchClientIp,
 } from "../lib/keys-rate-limit.js";
 import { requireAuth, type AuthVariables } from "../middleware/auth.js";
 import { requireEmailVerified } from "../middleware/require-email-verified.js";
@@ -33,13 +34,31 @@ type KeyRow = {
   dek_verifier: string;
 };
 
+function requestClientIp(c: { req: { raw: Request; header: (name: string) => string | undefined } }): string | null {
+  const incoming = c.req.raw as unknown as IncomingMessage;
+  const remoteAddress = incoming.socket?.remoteAddress ?? null;
+  return resolveKeyFetchClientIp(c.req.header("x-forwarded-for"), remoteAddress);
+}
+
+function keyMaterialJsonError(
+  reason: "KEYS_NOT_SET" | "KEY_VERSION_MISMATCH" | "DEK_VERIFIER_MISMATCH"
+) {
+  if (reason === "KEYS_NOT_SET") {
+    return { status: 404 as const, body: { error: "KEYS_NOT_SET" } };
+  }
+  if (reason === "DEK_VERIFIER_MISMATCH") {
+    return { status: 403 as const, body: { error: "DEK_VERIFIER_MISMATCH" } };
+  }
+  return { status: 409 as const, body: { error: "KEY_VERSION_MISMATCH" } };
+}
+
 export const keysRoutes = new Hono<{ Variables: AuthVariables }>();
 
 keysRoutes.use("*", requireAuth, requireEmailVerified);
 
 keysRoutes.get("/", async (c) => {
   const userId = c.get("userId");
-  const ip = clientIpFromRequest(c.req.raw.headers);
+  const ip = requestClientIp(c);
 
   const rate = await checkKeyFetchRateLimit(pool, userId, ip);
   if (!rate.allowed) {
@@ -88,19 +107,14 @@ keysRoutes.put("/", async (c) => {
     throw err;
   }
 
-  const existing = await pool.query(`SELECT user_id FROM user_key_material WHERE user_id = $1`, [
-    userId,
-  ]);
-  if (existing.rows.length > 0) {
-    return c.json({ error: "KEYS_ALREADY_SET" }, 409);
-  }
-
-  await pool.query(
+  const inserted = await pool.query<{ user_id: string }>(
     `INSERT INTO user_key_material (
        user_id, key_version, kdf, kdf_params, salt,
        pass_wrap_nonce, pass_wrapped_dek,
        recovery_wrap_nonce, recovery_wrapped_dek, dek_verifier
-     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+     ON CONFLICT (user_id) DO NOTHING
+     RETURNING user_id`,
     [
       userId,
       material.keyVersion,
@@ -114,6 +128,10 @@ keysRoutes.put("/", async (c) => {
       material.dekVerifier,
     ]
   );
+
+  if (inserted.rows.length === 0) {
+    return c.json({ error: "KEYS_ALREADY_SET" }, 409);
+  }
 
   return c.json(rowToKeyResponse({
     key_version: material.keyVersion,
@@ -145,34 +163,19 @@ keysRoutes.post("/rewrap", async (c) => {
     throw err;
   }
 
-  const result = await pool.query<KeyRow>(
-    `SELECT key_version, kdf, kdf_params, salt,
-            pass_wrap_nonce, pass_wrapped_dek,
-            recovery_wrap_nonce, recovery_wrapped_dek, dek_verifier
-     FROM user_key_material WHERE user_id = $1`,
-    [userId]
-  );
-  const row = result.rows[0];
-  if (!row) {
-    return c.json({ error: "KEYS_NOT_SET" }, 404);
-  }
-
-  if (row.key_version !== material.keyVersion) {
-    return c.json({ error: "KEY_VERSION_MISMATCH" }, 409);
-  }
-
-  if (!dekVerifiersMatch(row.dek_verifier, material.dekVerifier)) {
-    return c.json({ error: "DEK_VERIFIER_MISMATCH" }, 403);
-  }
-
-  await pool.query(
+  const updated = await pool.query<KeyRow>(
     `UPDATE user_key_material
-     SET kdf_params = $2, salt = $3,
-         pass_wrap_nonce = $4, pass_wrapped_dek = $5,
+     SET kdf_params = $4, salt = $5,
+         pass_wrap_nonce = $6, pass_wrapped_dek = $7,
          updated_at = now()
-     WHERE user_id = $1`,
+     WHERE user_id = $1 AND key_version = $2 AND dek_verifier = $3
+     RETURNING key_version, kdf, kdf_params, salt,
+               pass_wrap_nonce, pass_wrapped_dek,
+               recovery_wrap_nonce, recovery_wrapped_dek, dek_verifier`,
     [
       userId,
+      material.keyVersion,
+      material.dekVerifier,
       material.kdfParams,
       material.salt,
       material.passWrap.nonce,
@@ -180,15 +183,18 @@ keysRoutes.post("/rewrap", async (c) => {
     ]
   );
 
-  const updated = await pool.query<KeyRow>(
-    `SELECT key_version, kdf, kdf_params, salt,
-            pass_wrap_nonce, pass_wrapped_dek,
-            recovery_wrap_nonce, recovery_wrapped_dek, dek_verifier
-     FROM user_key_material WHERE user_id = $1`,
-    [userId]
-  );
-  const next = updated.rows[0]!;
-  return c.json(rowToKeyResponse(next));
+  if (updated.rows.length === 0) {
+    const reason = await classifyKeyMaterialUpdateFailure(
+      pool,
+      userId,
+      material.keyVersion,
+      material.dekVerifier
+    );
+    const err = keyMaterialJsonError(reason);
+    return c.json(err.body, err.status);
+  }
+
+  return c.json(rowToKeyResponse(updated.rows[0]!));
 });
 
 keysRoutes.post("/recovery", async (c) => {
@@ -209,41 +215,33 @@ keysRoutes.post("/recovery", async (c) => {
     throw err;
   }
 
-  const result = await pool.query<KeyRow>(
-    `SELECT key_version, dek_verifier,
-            recovery_wrap_nonce, recovery_wrapped_dek,
-            kdf, kdf_params, salt, pass_wrap_nonce, pass_wrapped_dek
-     FROM user_key_material WHERE user_id = $1`,
-    [userId]
-  );
-  const row = result.rows[0];
-  if (!row) {
-    return c.json({ error: "KEYS_NOT_SET" }, 404);
-  }
-
-  if (row.key_version !== material.keyVersion) {
-    return c.json({ error: "KEY_VERSION_MISMATCH" }, 409);
-  }
-
-  if (!dekVerifiersMatch(row.dek_verifier, material.dekVerifier)) {
-    return c.json({ error: "DEK_VERIFIER_MISMATCH" }, 403);
-  }
-
-  await pool.query(
-    `UPDATE user_key_material
-     SET recovery_wrap_nonce = $2, recovery_wrapped_dek = $3,
-         updated_at = now()
-     WHERE user_id = $1`,
-    [userId, material.recoveryWrap.nonce, material.recoveryWrap.ct]
-  );
-
   const updated = await pool.query<KeyRow>(
-    `SELECT key_version, kdf, kdf_params, salt,
-            pass_wrap_nonce, pass_wrapped_dek,
-            recovery_wrap_nonce, recovery_wrapped_dek, dek_verifier
-     FROM user_key_material WHERE user_id = $1`,
-    [userId]
+    `UPDATE user_key_material
+     SET recovery_wrap_nonce = $4, recovery_wrapped_dek = $5,
+         updated_at = now()
+     WHERE user_id = $1 AND key_version = $2 AND dek_verifier = $3
+     RETURNING key_version, kdf, kdf_params, salt,
+               pass_wrap_nonce, pass_wrapped_dek,
+               recovery_wrap_nonce, recovery_wrapped_dek, dek_verifier`,
+    [
+      userId,
+      material.keyVersion,
+      material.dekVerifier,
+      material.recoveryWrap.nonce,
+      material.recoveryWrap.ct,
+    ]
   );
-  const next = updated.rows[0]!;
-  return c.json(rowToKeyResponse(next));
+
+  if (updated.rows.length === 0) {
+    const reason = await classifyKeyMaterialUpdateFailure(
+      pool,
+      userId,
+      material.keyVersion,
+      material.dekVerifier
+    );
+    const err = keyMaterialJsonError(reason);
+    return c.json(err.body, err.status);
+  }
+
+  return c.json(rowToKeyResponse(updated.rows[0]!));
 });

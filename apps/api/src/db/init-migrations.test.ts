@@ -1,14 +1,34 @@
 import assert from "node:assert/strict";
 import { execSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { after, describe, it } from "node:test";
+import { after, before, describe, it } from "node:test";
 import pg from "pg";
 
+const databaseUrl = process.env.DATABASE_URL;
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../..");
 const initDir = path.join(repoRoot, "db/init");
 
-function psqlAvailable(): boolean {
+function adminDatabaseUrl(): string | null {
+  if (!databaseUrl) {
+    return null;
+  }
+  try {
+    const url = new URL(databaseUrl);
+    url.pathname = "/postgres";
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
+async function runSqlFile(client: pg.Client, filePath: string): Promise<void> {
+  const sql = readFileSync(filePath, "utf8");
+  await client.query(sql);
+}
+
+function sudoPostgresAvailable(): boolean {
   try {
     execSync("command -v psql", { stdio: "ignore" });
     execSync("sudo -n -u postgres psql -c 'SELECT 1'", { stdio: "ignore" });
@@ -18,43 +38,77 @@ function psqlAvailable(): boolean {
   }
 }
 
-function runPsqlDb(dbName: string, sqlFile: string): void {
-  execSync(
-    `sudo -u postgres psql -v ON_ERROR_STOP=1 -d ${dbName} -f ${sqlFile}`,
-    { stdio: "pipe" }
-  );
-}
-
-function runPsqlAdmin(sql: string): void {
+function sudoPsqlAdmin(sql: string): void {
   execSync(`sudo -u postgres psql -v ON_ERROR_STOP=1 -c ${JSON.stringify(sql)}`, {
     stdio: "pipe",
   });
 }
 
-function grantCursorSync(dbName: string): void {
-  runPsqlAdmin(
-    `GRANT ALL ON ALL TABLES IN SCHEMA public TO cursor_sync; GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO cursor_sync; ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO cursor_sync;`
-  );
-  execSync(
-    `sudo -u postgres psql -v ON_ERROR_STOP=1 -d ${dbName} -c "GRANT ALL ON ALL TABLES IN SCHEMA public TO cursor_sync; GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO cursor_sync;"`,
-    { stdio: "pipe" }
-  );
+async function createIsolatedDatabase(
+  adminClient: pg.Client,
+  dbName: string
+): Promise<void> {
+  try {
+    await adminClient.query(`CREATE DATABASE ${dbName}`);
+  } catch (error: unknown) {
+    const code =
+      error && typeof error === "object" && "code" in error
+        ? String(error.code)
+        : "";
+    if (code === "42501" && sudoPostgresAvailable()) {
+      sudoPsqlAdmin(`CREATE DATABASE ${dbName} OWNER cursor_sync`);
+      return;
+    }
+    throw error;
+  }
 }
 
-const canRun = psqlAvailable();
+async function dropIsolatedDatabase(
+  adminClient: pg.Client,
+  dbName: string
+): Promise<void> {
+  try {
+    await adminClient.query(`DROP DATABASE IF EXISTS ${dbName}`);
+  } catch (error: unknown) {
+    const code =
+      error && typeof error === "object" && "code" in error
+        ? String(error.code)
+        : "";
+    if (code === "42501" && sudoPostgresAvailable()) {
+      sudoPsqlAdmin(`DROP DATABASE IF EXISTS ${dbName}`);
+      return;
+    }
+    throw error;
+  }
+}
 
-describe("postgres init scripts 001-004", { skip: !canRun }, () => {
+describe("postgres init scripts 001-004", { skip: !databaseUrl }, () => {
   const dbName = `cursor_sync_init_${Date.now()}`;
+  let adminClient: pg.Client;
   let pool: pg.Pool;
+
+  before(async () => {
+    const adminUrl = adminDatabaseUrl();
+    assert.ok(adminUrl, "DATABASE_URL must be parseable");
+    adminClient = new pg.Client({ connectionString: adminUrl });
+    await adminClient.connect();
+    await dropIsolatedDatabase(adminClient, dbName);
+    await createIsolatedDatabase(adminClient, dbName);
+  });
 
   after(async () => {
     await pool?.end().catch(() => undefined);
-    runPsqlAdmin(`DROP DATABASE IF EXISTS ${dbName}`);
+    if (adminClient) {
+      await dropIsolatedDatabase(adminClient, dbName);
+      await adminClient.end();
+    }
   });
 
-  it("applies 001-003 then 004 twice idempotently", () => {
-    runPsqlAdmin(`DROP DATABASE IF EXISTS ${dbName}`);
-    runPsqlAdmin(`CREATE DATABASE ${dbName} OWNER cursor_sync`);
+  it("applies 001-003 then 004 twice idempotently", async () => {
+    const bootstrap = new pg.Client({
+      connectionString: databaseUrl!.replace(/\/[^/]+$/, `/${dbName}`),
+    });
+    await bootstrap.connect();
 
     const files = [
       "001_schema.sql",
@@ -63,16 +117,16 @@ describe("postgres init scripts 001-004", { skip: !canRun }, () => {
       "004_e2e_keys.sql",
     ];
     for (const file of files) {
-      runPsqlDb(dbName, path.join(initDir, file));
+      await runSqlFile(bootstrap, path.join(initDir, file));
     }
-    runPsqlDb(dbName, path.join(initDir, "004_e2e_keys.sql"));
-    runPsqlDb(dbName, path.join(initDir, "004_e2e_keys.sql"));
-    grantCursorSync(dbName);
+    await runSqlFile(bootstrap, path.join(initDir, "004_e2e_keys.sql"));
+    await runSqlFile(bootstrap, path.join(initDir, "004_e2e_keys.sql"));
+    await bootstrap.end();
   });
 
   it("enforces user_key_material and manifest CHECK constraints", async () => {
     pool = new pg.Pool({
-      connectionString: `postgres://cursor_sync:cursor_sync@localhost:5432/${dbName}`,
+      connectionString: databaseUrl!.replace(/\/[^/]+$/, `/${dbName}`),
     });
 
     const user = await pool.query<{ id: string }>(
