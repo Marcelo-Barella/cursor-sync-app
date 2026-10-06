@@ -1,7 +1,13 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { decodeManifestCiphertextBase64 } from "../lib/cse1-manifest.js";
+import {
+  E2E_REQUIRED_MESSAGE,
+  isLegacyPlaintextPayloadWrite,
+  legacyObjectKeysFromPayload,
+} from "../lib/legacy-config-payload.js";
 import { pool } from "../db/pool.js";
+import { userHasKeyMaterial } from "../lib/user-key-material.js";
 import { requireAuth, type AuthVariables } from "../middleware/auth.js";
 
 const putBodySchema = z
@@ -26,8 +32,8 @@ type ConfigRow = {
   updated_at: Date;
 };
 
-function configResponse(row: ConfigRow) {
-  return {
+async function configResponseForUser(row: ConfigRow, userId: string) {
+  const base = {
     payload: row.payload,
     manifestCiphertext: row.manifest_ciphertext
       ? row.manifest_ciphertext.toString("base64")
@@ -35,6 +41,13 @@ function configResponse(row: ConfigRow) {
     manifestVersion: Number(row.manifest_version),
     updated_at: row.updated_at,
   };
+  if (await userHasKeyMaterial(pool, userId)) {
+    return {
+      ...base,
+      legacyPlaintextObjectKeys: legacyObjectKeysFromPayload(row.payload),
+    };
+  }
+  return base;
 }
 
 export const configsRoutes = new Hono<{ Variables: AuthVariables }>();
@@ -55,7 +68,7 @@ configsRoutes.get("/", requireAuth, async (c) => {
     return c.json({ error: "Failed to load config" }, 500);
   }
 
-  return c.json(configResponse(row));
+  return c.json(await configResponseForUser(row, userId));
 });
 
 configsRoutes.put("/", requireAuth, async (c) => {
@@ -66,6 +79,8 @@ configsRoutes.put("/", requireAuth, async (c) => {
   if (!parsed.success) {
     return c.json({ error: "Invalid payload" }, 400);
   }
+
+  const keysConfigured = await userHasKeyMaterial(pool, userId);
 
   if (parsed.data.manifestCiphertext !== undefined) {
     let manifestBuf: Buffer;
@@ -101,6 +116,13 @@ configsRoutes.put("/", requireAuth, async (c) => {
         ? {}
         : parsed.data.payload ?? existing?.payload ?? {};
 
+    if (keysConfigured && isLegacyPlaintextPayloadWrite(parsed.data.payload)) {
+      return c.json(
+        { error: "E2E_REQUIRED", message: E2E_REQUIRED_MESSAGE },
+        409
+      );
+    }
+
     const updated = await pool.query<ConfigRow>(
       `UPDATE configs
        SET manifest_ciphertext = $2,
@@ -116,7 +138,14 @@ configsRoutes.put("/", requireAuth, async (c) => {
       return c.json({ error: "MANIFEST_VERSION_MISMATCH" }, 409);
     }
 
-    return c.json(configResponse(updated.rows[0]!));
+    return c.json(await configResponseForUser(updated.rows[0]!, userId));
+  }
+
+  if (keysConfigured && isLegacyPlaintextPayloadWrite(parsed.data.payload)) {
+    return c.json(
+      { error: "E2E_REQUIRED", message: E2E_REQUIRED_MESSAGE },
+      409
+    );
   }
 
   if (parsed.data.payload === undefined && parsed.data.clearLegacyPayload !== true) {
@@ -140,5 +169,5 @@ configsRoutes.put("/", requireAuth, async (c) => {
     return c.json({ error: "Failed to save config" }, 500);
   }
 
-  return c.json(configResponse(row));
+  return c.json(await configResponseForUser(row, userId));
 });
