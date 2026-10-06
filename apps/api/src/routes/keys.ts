@@ -12,12 +12,12 @@ import {
   rowToKeyResponse,
   setupBodySchema,
 } from "../lib/key-material.js";
+import { clientIpFromForwarded } from "../lib/client-ip.js";
 import {
   KEY_FETCH_STATUS,
   auditLogKeyFetch,
   checkKeyFetchRateLimit,
   recordKeyFetchAudit,
-  resolveKeyFetchClientIp,
 } from "../lib/keys-rate-limit.js";
 import { requireAuth, type AuthVariables } from "../middleware/auth.js";
 import { requireEmailVerified } from "../middleware/require-email-verified.js";
@@ -37,7 +37,7 @@ type KeyRow = {
 function requestClientIp(c: { req: { raw: Request; header: (name: string) => string | undefined } }): string | null {
   const incoming = c.req.raw as unknown as IncomingMessage;
   const remoteAddress = incoming.socket?.remoteAddress ?? null;
-  return resolveKeyFetchClientIp(c.req.header("x-forwarded-for"), remoteAddress);
+  return clientIpFromForwarded(c.req.header("x-forwarded-for"), remoteAddress);
 }
 
 function keyMaterialJsonError(
