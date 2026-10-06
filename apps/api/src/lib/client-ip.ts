@@ -1,0 +1,47 @@
+import { isIP } from "node:net";
+
+export function trustedProxyHops(): number {
+  const raw = process.env.TRUSTED_PROXY_HOPS;
+  const n = raw ? Number.parseInt(raw, 10) : 1;
+  if (!Number.isFinite(n) || n < 0) {
+    return 1;
+  }
+  return Math.floor(n);
+}
+
+export function normalizeIpAddress(value: string | null | undefined): string | null {
+  if (value == null) {
+    return null;
+  }
+  let ip = value.trim();
+  if (!ip) {
+    return null;
+  }
+  if (ip.startsWith("::ffff:")) {
+    ip = ip.slice("::ffff:".length);
+  }
+  return isIP(ip) ? ip : null;
+}
+
+/**
+ * Express-compatible trusted proxy hop selection: client is parts[length - hops]
+ * when the XFF chain has at least `hops` entries; otherwise use the socket peer.
+ */
+export function clientIpFromForwarded(
+  xForwardedFor: string | null | undefined,
+  remoteAddress: string | null | undefined,
+  hops = trustedProxyHops()
+): string | null {
+  const xff = xForwardedFor?.trim();
+  if (xff && hops >= 1) {
+    const parts = xff.split(",").map((part) => part.trim()).filter(Boolean);
+    if (parts.length >= hops) {
+      const index = parts.length - hops;
+      const fromHeader = normalizeIpAddress(parts[index]);
+      if (fromHeader) {
+        return fromHeader;
+      }
+    }
+  }
+  return normalizeIpAddress(remoteAddress);
+}

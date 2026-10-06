@@ -2,19 +2,62 @@ export const EXTENSION_AUTH_URI = "cursor://MarceloBarella.cursor-sync/auth";
 
 const ALLOWED_AUTHORITY = "marcelobarella.cursor-sync";
 
-export function isAllowedExtensionRedirectUri(uri: string): boolean {
-  try {
-    const url = new URL(uri);
-    if (url.pathname !== "/auth") {
-      return false;
-    }
-    if (url.protocol !== "cursor:" && url.protocol !== "vscode:") {
-      return false;
-    }
-    return url.hostname.toLowerCase() === ALLOWED_AUTHORITY;
-  } catch {
-    return false;
+function normalizeAuthPath(pathname: string): string {
+  const trimmed = pathname.replace(/\/+$/, "");
+  return trimmed === "" ? "/" : trimmed;
+}
+
+export function normalizeExtensionRedirectUri(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return null;
   }
+  let candidate = trimmed;
+  if (candidate.includes("%")) {
+    try {
+      candidate = decodeURIComponent(candidate);
+    } catch {
+      candidate = trimmed;
+    }
+  }
+  try {
+    const url = new URL(candidate);
+    if (url.protocol !== "cursor:" && url.protocol !== "vscode:") {
+      return null;
+    }
+    if (normalizeAuthPath(url.pathname) !== "/auth") {
+      return null;
+    }
+    if (url.hostname.toLowerCase() !== ALLOWED_AUTHORITY) {
+      return null;
+    }
+    return `${url.protocol}//${url.hostname.toLowerCase()}/auth`;
+  } catch {
+    return null;
+  }
+}
+
+export function isAllowedExtensionRedirectUri(uri: string): boolean {
+  return normalizeExtensionRedirectUri(uri) !== null;
+}
+
+export function readRedirectUriFromSearchParams(
+  searchParams: Pick<URLSearchParams, "get">
+): string | null {
+  const raw =
+    searchParams.get("redirect_uri") ??
+    searchParams.get("redirectUri") ??
+    searchParams.get("redirect");
+  if (!raw) {
+    return null;
+  }
+  return normalizeExtensionRedirectUri(raw);
+}
+
+export function readOAuthStateFromSearchParams(
+  searchParams: Pick<URLSearchParams, "get">
+): string | null {
+  return searchParams.get("state") ?? searchParams.get("oauth_state");
 }
 
 export function buildExtensionAuthRedirectUrl(
@@ -22,24 +65,23 @@ export function buildExtensionAuthRedirectUrl(
   code: string,
   state?: string | null
 ): string {
-  if (!isAllowedExtensionRedirectUri(redirectUri)) {
+  if (/[?&]token=/i.test(redirectUri)) {
+    throw new Error("Refusing to put session token in redirect URL");
+  }
+  const normalized = normalizeExtensionRedirectUri(redirectUri);
+  if (!normalized) {
     throw new Error("Invalid redirect URI");
   }
 
   const hashIndex = redirectUri.indexOf("#");
-  const base = hashIndex === -1 ? redirectUri : redirectUri.slice(0, hashIndex);
   const fragment = hashIndex === -1 ? "" : redirectUri.slice(hashIndex);
-  const url = new URL(base);
+  const url = new URL(normalized);
   url.searchParams.set("code", code);
   if (state != null && state !== "") {
     url.searchParams.set("state", state);
   }
 
-  const result = `${url.toString()}${fragment}`;
-  if (/[?&]token=/i.test(result)) {
-    throw new Error("Refusing to put session token in redirect URL");
-  }
-  return result;
+  return `${url.toString()}${fragment}`;
 }
 
 export const TOKEN_STORAGE_KEY = "cursor_sync_session_token";
@@ -59,7 +101,14 @@ export function clearToken(): void {
 }
 
 export function saveOAuthParams(redirectUri: string, state: string | null): void {
-  sessionStorage.setItem(OAUTH_REDIRECT_URI_KEY, redirectUri);
+  if (typeof sessionStorage === "undefined") {
+    return;
+  }
+  const normalized = normalizeExtensionRedirectUri(redirectUri);
+  if (!normalized) {
+    return;
+  }
+  sessionStorage.setItem(OAUTH_REDIRECT_URI_KEY, normalized);
   if (state != null && state !== "") {
     sessionStorage.setItem(OAUTH_STATE_KEY, state);
   } else {
@@ -68,7 +117,14 @@ export function saveOAuthParams(redirectUri: string, state: string | null): void
 }
 
 export function readOAuthRedirectUri(): string | null {
-  return sessionStorage.getItem(OAUTH_REDIRECT_URI_KEY);
+  if (typeof sessionStorage === "undefined") {
+    return null;
+  }
+  const stored = sessionStorage.getItem(OAUTH_REDIRECT_URI_KEY);
+  if (!stored) {
+    return null;
+  }
+  return normalizeExtensionRedirectUri(stored);
 }
 
 export function readOAuthState(): string | null {
@@ -78,14 +134,22 @@ export function readOAuthState(): string | null {
 export function resolveOAuthRedirectUri(
   queryRedirectUri: string | null
 ): string | null {
-  if (queryRedirectUri && isAllowedExtensionRedirectUri(queryRedirectUri)) {
-    return queryRedirectUri;
+  if (queryRedirectUri) {
+    const fromQuery = normalizeExtensionRedirectUri(queryRedirectUri);
+    if (fromQuery) {
+      return fromQuery;
+    }
   }
-  const stored = readOAuthRedirectUri();
-  if (stored && isAllowedExtensionRedirectUri(stored)) {
-    return stored;
-  }
-  return null;
+  return readOAuthRedirectUri();
+}
+
+export function resolveOAuthRedirectUriForHandoff(
+  queryRedirectUri: string | null
+): string | null {
+  return (
+    resolveOAuthRedirectUri(queryRedirectUri) ??
+    normalizeExtensionRedirectUri(EXTENSION_AUTH_URI)
+  );
 }
 
 export function authPathWithOAuthQuery(
@@ -93,10 +157,13 @@ export function authPathWithOAuthQuery(
   redirectUri: string | null,
   state: string | null
 ): string {
-  if (!redirectUri || !isAllowedExtensionRedirectUri(redirectUri)) {
+  const normalized = redirectUri
+    ? normalizeExtensionRedirectUri(redirectUri)
+    : null;
+  if (!normalized) {
     return path;
   }
-  const params = new URLSearchParams({ redirect_uri: redirectUri });
+  const params = new URLSearchParams({ redirect_uri: normalized });
   if (state != null && state !== "") {
     params.set("state", state);
   }

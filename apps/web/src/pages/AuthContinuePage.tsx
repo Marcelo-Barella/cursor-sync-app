@@ -1,16 +1,22 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { getMe, issueLoginCode } from "../lib/api";
+import { getMe, issueLoginCode, resendVerificationEmail } from "../lib/api";
 import {
-  attemptExtensionHandoff,
   authPathWithOAuthQuery,
   clearToken,
   readOAuthRedirectUri,
   readOAuthState,
+  readOAuthStateFromSearchParams,
+  readRedirectUriFromSearchParams,
   readToken,
-  resolveOAuthRedirectUri,
+  resolveOAuthRedirectUriForHandoff,
   saveOAuthParams,
 } from "../lib/auth";
+import {
+  clearEmailVerificationNotice,
+  readEmailVerificationNotice,
+} from "../lib/emailVerificationNotice";
+import { savePendingLoginCode } from "../lib/loginHandoff";
 import { AuthLayout } from "../components/AuthLayout";
 import { Button } from "../components/Button";
 
@@ -23,17 +29,33 @@ export function AuthContinuePage() {
   const [token, setToken] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [handoffError, setHandoffError] = useState<string | null>(null);
-
-  const queryRedirectUri = searchParams.get("redirect_uri");
-  const queryState = searchParams.get("state");
-  const redirectUri = resolveOAuthRedirectUri(queryRedirectUri);
-  const oauthState = queryState ?? readOAuthState();
+  const [emailVerified, setEmailVerified] = useState(true);
+  const [resendBusy, setResendBusy] = useState(false);
+  const [resendMessage, setResendMessage] = useState<string | null>(null);
+  const [signupNotice, setSignupNotice] = useState<string | null>(null);
+  const handoffStarted = useRef(false);
 
   useEffect(() => {
-    if (queryRedirectUri && !redirectUri) {
-      setState("invalid-link");
+    const notice = readEmailVerificationNotice();
+    if (!notice) {
       return;
     }
+    clearEmailVerificationNotice();
+    if (notice.sent) {
+      setSignupNotice("We sent a verification link to your email.");
+    } else if (notice.warning) {
+      setSignupNotice(notice.warning);
+    } else {
+      setSignupNotice("Check your email for a verification link.");
+    }
+  }, []);
+
+  const queryRedirectUri = readRedirectUriFromSearchParams(searchParams);
+  const queryState = readOAuthStateFromSearchParams(searchParams);
+  const oauthState = queryState ?? readOAuthState();
+  const redirectUri = resolveOAuthRedirectUriForHandoff(queryRedirectUri);
+
+  useEffect(() => {
     if (redirectUri) {
       saveOAuthParams(redirectUri, oauthState);
     }
@@ -45,9 +67,11 @@ export function AuthContinuePage() {
     }
 
     getMe(sessionToken)
-      .then(() => {
+      .then((me) => {
         setToken(sessionToken);
-        if (!redirectUri) {
+        setEmailVerified(me.emailVerified !== false);
+        const handoffTarget = resolveOAuthRedirectUriForHandoff(queryRedirectUri);
+        if (!handoffTarget) {
           setState("invalid-link");
           return;
         }
@@ -61,10 +85,11 @@ export function AuthContinuePage() {
 
   const callbackPath = authPathWithOAuthQuery("/auth/callback", redirectUri, oauthState);
 
-  const performHandoff = useCallback(async () => {
+  const issueCodeAndGoToCallback = useCallback(async () => {
     const sessionToken = token ?? readToken();
     const targetRedirectUri =
-      redirectUri ?? resolveOAuthRedirectUri(queryRedirectUri) ?? readOAuthRedirectUri();
+      resolveOAuthRedirectUriForHandoff(queryRedirectUri) ??
+      readOAuthRedirectUri();
     const targetState = oauthState ?? readOAuthState();
 
     if (!sessionToken || !targetRedirectUri) {
@@ -81,20 +106,50 @@ export function AuthContinuePage() {
         targetRedirectUri,
         targetState
       );
-      attemptExtensionHandoff(
-        targetRedirectUri,
-        issued.code,
-        issued.state ?? targetState
-      );
+      savePendingLoginCode(issued.code);
       navigate(callbackPath, { replace: true });
     } catch {
       setHandoffError("Could not issue a sign-in code. Try again.");
     } finally {
       setBusy(false);
     }
-  }, [token, redirectUri, queryRedirectUri, oauthState, navigate, callbackPath]);
+  }, [token, queryRedirectUri, oauthState, navigate, callbackPath]);
+
+  useEffect(() => {
+    if (state !== "ready" || busy || handoffStarted.current) {
+      return;
+    }
+    handoffStarted.current = true;
+    void issueCodeAndGoToCallback();
+  }, [state, busy, issueCodeAndGoToCallback]);
 
   const signInPath = authPathWithOAuthQuery("/sign-in", redirectUri, oauthState);
+
+  async function handleResendVerification() {
+    const sessionToken = token ?? readToken();
+    if (!sessionToken) {
+      return;
+    }
+    setResendBusy(true);
+    setResendMessage(null);
+    try {
+      const result = await resendVerificationEmail(sessionToken);
+      if (result.alreadyVerified) {
+        setEmailVerified(true);
+        setResendMessage("Your email is already verified.");
+      } else if (result.sent) {
+        setResendMessage("Verification email sent. Check your inbox.");
+      } else {
+        setResendMessage(
+          result.warning ?? "Could not send verification email. Try again later."
+        );
+      }
+    } catch {
+      setResendMessage("Could not send verification email. Try again later.");
+    } finally {
+      setResendBusy(false);
+    }
+  }
 
   if (state === "loading") {
     return (
@@ -153,10 +208,32 @@ export function AuthContinuePage() {
 
   return (
     <AuthLayout page="continue" showMarkInCard>
+      {!emailVerified ? (
+        <div className="auth-form-error-block" role="status">
+          <p className="auth-form-error-muted">
+            {signupNotice ??
+              "Verify your email address. We sent a link when you signed up."}
+          </p>
+          {resendMessage ? (
+            <p className="auth-card-sub">{resendMessage}</p>
+          ) : null}
+          <Button
+            type="button"
+            variant="secondary"
+            fullWidth
+            loading={resendBusy}
+            onClick={() => {
+              void handleResendVerification();
+            }}
+          >
+            Resend verification email
+          </Button>
+        </div>
+      ) : null}
       <div className="auth-card-header">
         <h1 className="auth-card-title">Continue in Cursor</h1>
         <p className="auth-card-body">
-          You&apos;re signed in. Return to Cursor to finish.
+          You&apos;re signed in. Preparing your login code…
         </p>
       </div>
       <div className="auth-card-actions">
@@ -165,7 +242,7 @@ export function AuthContinuePage() {
           fullWidth
           loading={busy}
           onClick={() => {
-            void performHandoff();
+            void issueCodeAndGoToCallback();
           }}
         >
           Continue in Cursor
@@ -175,7 +252,6 @@ export function AuthContinuePage() {
             {handoffError}
           </p>
         ) : null}
-        <p className="auth-card-helper">You can safely close this window.</p>
       </div>
     </AuthLayout>
   );

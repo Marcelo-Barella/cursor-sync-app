@@ -53,6 +53,35 @@ export type MintedCredentials = {
   expiresAt: string;
 };
 
+export async function deleteUserObjects(
+  config: R2Config,
+  userId: string,
+  relativeKeys: string[]
+): Promise<void> {
+  const { S3Client, DeleteObjectsCommand } = await import("@aws-sdk/client-s3");
+  const client = new S3Client({
+    region: "auto",
+    endpoint: `https://${config.accountId}.r2.cloudflarestorage.com`,
+    credentials: {
+      accessKeyId: config.parentAccessKeyId,
+      secretAccessKey: config.parentSecretAccessKey,
+    },
+  });
+
+  const prefix = `users/${userId}/`;
+  const objects = relativeKeys.map((key) => ({ Key: `${prefix}${key}` }));
+
+  await client.send(
+    new DeleteObjectsCommand({
+      Bucket: config.bucket,
+      Delete: {
+        Objects: objects,
+        Quiet: true,
+      },
+    })
+  );
+}
+
 export async function mintTempCredentials(
   config: R2Config,
   userId: string,

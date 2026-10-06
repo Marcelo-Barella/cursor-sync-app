@@ -4,6 +4,7 @@ import { cors } from "hono/cors";
 import { pingDatabase } from "./db/pool.js";
 import { authRoutes } from "./routes/auth.js";
 import { configsRoutes } from "./routes/configs.js";
+import { keysRoutes } from "./routes/keys.js";
 import { loginRoutes } from "./routes/login.js";
 import { storageRoutes } from "./routes/storage.js";
 import { resolveCorsOrigin } from "./lib/cors.js";
@@ -22,7 +23,7 @@ app.use(
   "*",
   cors({
     origin: (origin) => resolveCorsOrigin(origin),
-    allowMethods: ["GET", "POST", "OPTIONS"],
+    allowMethods: ["GET", "POST", "PUT", "OPTIONS"],
     allowHeaders: ["Content-Type", "Authorization"],
   })
 );
@@ -38,6 +39,7 @@ app.get("/health", async (c) => {
 
 app.route("/auth", authRoutes);
 app.route("/configs", configsRoutes);
+app.route("/v1/keys", keysRoutes);
 app.route("/v1/storage", storageRoutes);
 app.route("/", loginRoutes);
 

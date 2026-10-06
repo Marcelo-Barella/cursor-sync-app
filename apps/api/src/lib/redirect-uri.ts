@@ -1,18 +1,34 @@
 const ALLOWED_AUTHORITY = "marcelobarella.cursor-sync";
 
-export function isAllowedRedirectUri(uri: string): boolean {
-  try {
-    const url = new URL(uri);
-    if (url.pathname !== "/auth") {
-      return false;
-    }
-    if (url.protocol !== "cursor:" && url.protocol !== "vscode:") {
-      return false;
-    }
-    return url.hostname.toLowerCase() === ALLOWED_AUTHORITY;
-  } catch {
-    return false;
+function normalizeAuthPath(pathname: string): string {
+  const trimmed = pathname.replace(/\/+$/, "");
+  return trimmed === "" ? "/" : trimmed;
+}
+
+export function normalizeRedirectUri(uri: string): string | null {
+  const trimmed = uri.trim();
+  if (!trimmed) {
+    return null;
   }
+  try {
+    const url = new URL(trimmed);
+    if (url.protocol !== "cursor:" && url.protocol !== "vscode:") {
+      return null;
+    }
+    if (normalizeAuthPath(url.pathname) !== "/auth") {
+      return null;
+    }
+    if (url.hostname.toLowerCase() !== ALLOWED_AUTHORITY) {
+      return null;
+    }
+    return `${url.protocol}//${url.hostname.toLowerCase()}/auth`;
+  } catch {
+    return null;
+  }
+}
+
+export function isAllowedRedirectUri(uri: string): boolean {
+  return normalizeRedirectUri(uri) !== null;
 }
 
 export function appendCodeToRedirectUri(
@@ -28,10 +44,11 @@ export function buildAuthCallbackRedirect(
   code: string,
   state?: string
 ): string {
+  const normalized = normalizeRedirectUri(redirectUri) ?? redirectUri;
   const hashIndex = redirectUri.indexOf("#");
-  const base = hashIndex === -1 ? redirectUri : redirectUri.slice(0, hashIndex);
+  const base = hashIndex === -1 ? normalized : redirectUri.slice(0, hashIndex);
   const fragment = hashIndex === -1 ? "" : redirectUri.slice(hashIndex);
-  const url = new URL(base);
+  const url = new URL(normalized);
   url.searchParams.set("code", code);
   if (state !== undefined && state !== "") {
     url.searchParams.set("state", state);

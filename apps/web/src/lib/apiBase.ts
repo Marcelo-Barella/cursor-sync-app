@@ -1,8 +1,37 @@
+import {
+  CURSOR_SYNC_STAGING_API_BASE_URL,
+  DEFAULT_LOCAL_API_BASE_URL,
+  DEFAULT_PRODUCTION_API_BASE_URL,
+  DEFAULT_STAGING_API_BASE_URL,
+  isCursorSyncStagingHost,
+} from "./defaults";
+import { messageForAuthErrorCategory } from "./authErrors";
+
 export const API_BASE_STORAGE_KEY = "cursor-sync-api-base-url";
-export const DEFAULT_API_BASE_URL = "https://api.sync.bergamota.dev";
-export const LOCAL_API_PRESET = "http://localhost:8100";
+export const DEFAULT_API_BASE_URL = DEFAULT_PRODUCTION_API_BASE_URL;
+export const STAGING_API_BASE_URL = DEFAULT_STAGING_API_BASE_URL;
+export const LOCAL_API_PRESET = DEFAULT_LOCAL_API_BASE_URL;
 
 export const API_BASE_CHANGED_EVENT = "cursor-sync-api-base-changed";
+
+export function defaultApiBaseForMode(
+  mode: string = import.meta.env.MODE,
+  hostname?: string
+): string {
+  if (mode === "staging") {
+    const host =
+      hostname ??
+      (typeof window !== "undefined" ? window.location.hostname : "");
+    if (host && isCursorSyncStagingHost(host)) {
+      return CURSOR_SYNC_STAGING_API_BASE_URL;
+    }
+    return STAGING_API_BASE_URL;
+  }
+  if (mode === "development") {
+    return LOCAL_API_PRESET;
+  }
+  return "";
+}
 
 export function normalizeApiBaseUrl(raw: string): string | null {
   const trimmed = raw.trim();
@@ -50,9 +79,10 @@ export type ResolveApiBaseOptions = {
   search?: string;
   storage?: StorageLike | null;
   buildTimeUrl?: string;
+  mode?: string;
 };
 
-function readBuildTimeUrl(explicit?: string): string | undefined {
+export function readBuildTimeApiUrl(explicit?: string): string | undefined {
   const raw = explicit ?? import.meta.env.VITE_API_URL;
   if (typeof raw !== "string" || !raw.trim()) {
     return undefined;
@@ -60,7 +90,15 @@ function readBuildTimeUrl(explicit?: string): string | undefined {
   return raw;
 }
 
+export function isBuildTimeApiBaseConfigured(options?: {
+  buildTimeUrl?: string;
+}): boolean {
+  const raw = readBuildTimeApiUrl(options?.buildTimeUrl);
+  return raw !== undefined && normalizeApiBaseUrl(raw) !== null;
+}
+
 export function resolveApiBaseUrl(options: ResolveApiBaseOptions = {}): string {
+  const mode = options.mode ?? import.meta.env.MODE;
   const storage =
     options.storage ??
     (typeof localStorage !== "undefined" ? localStorage : null);
@@ -88,7 +126,7 @@ export function resolveApiBaseUrl(options: ResolveApiBaseOptions = {}): string {
     }
   }
 
-  const buildTimeRaw = readBuildTimeUrl(options.buildTimeUrl);
+  const buildTimeRaw = readBuildTimeApiUrl(options.buildTimeUrl);
   if (buildTimeRaw) {
     const normalized = normalizeApiBaseUrl(buildTimeRaw);
     if (normalized) {
@@ -96,11 +134,41 @@ export function resolveApiBaseUrl(options: ResolveApiBaseOptions = {}): string {
     }
   }
 
-  return DEFAULT_API_BASE_URL;
+  return defaultApiBaseForMode(mode);
 }
 
 export function getApiBaseUrl(): string {
-  return resolveApiBaseUrl();
+  const resolved = resolveApiBaseUrl();
+  const normalized = normalizeApiBaseUrl(resolved);
+  if (normalized) {
+    return normalized;
+  }
+  const fallback = defaultApiBaseForMode(import.meta.env.MODE);
+  return fallback;
+}
+
+export function getApiBaseUrlForAuth(): string | null {
+  const resolved = resolveApiBaseUrl();
+  const normalized = normalizeApiBaseUrl(resolved);
+  if (normalized) {
+    return normalized;
+  }
+  return null;
+}
+
+export function isAuthApiBaseMissing(): boolean {
+  return getApiBaseUrlForAuth() === null;
+}
+
+export function getApiBaseConfigurationError(): string | null {
+  if (isAuthApiBaseMissing()) {
+    return messageForAuthErrorCategory("empty_api_base");
+  }
+  return null;
+}
+
+export function isProductionLikeMode(mode: string = import.meta.env.MODE): boolean {
+  return mode === "production" || mode === "staging";
 }
 
 export function getStoredApiOverride(

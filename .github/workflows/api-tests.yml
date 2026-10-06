@@ -1,0 +1,43 @@
+name: API tests
+
+on:
+  push:
+    branches: [main, staging, "cursor/**"]
+  pull_request:
+
+jobs:
+  api:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: cursor_sync
+          POSTGRES_PASSWORD: cursor_sync
+          POSTGRES_DB: cursor_sync
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U cursor_sync -d cursor_sync"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - name: Apply database init scripts
+        env:
+          PGPASSWORD: cursor_sync
+        run: |
+          for f in db/init/*.sql; do
+            psql -h localhost -U cursor_sync -d cursor_sync -v ON_ERROR_STOP=1 -f "$f"
+          done
+      - name: Run API tests
+        env:
+          DATABASE_URL: postgres://cursor_sync:cursor_sync@localhost:5432/cursor_sync
+          JWT_SECRET: test-jwt-secret-with-enough-length
+        run: npm run test -w @cursor-sync/api
