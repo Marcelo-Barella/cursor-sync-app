@@ -1,14 +1,16 @@
 import { describe, expect, it } from "vitest";
 import {
   API_BASE_STORAGE_KEY,
-  STAGING_API_BASE_URL,
   defaultApiBaseForMode,
   normalizeApiBaseUrl,
   readQueryApiOverride,
   resolveApiBaseUrl,
   setStoredApiOverride,
 } from "./apiBase";
-import { CURSOR_SYNC_STAGING_API_BASE_URL } from "./defaults";
+import {
+  CURSOR_SYNC_STAGING_API_BASE_URL,
+  DEFAULT_STAGING_API_BASE_URL,
+} from "./defaults";
 
 function createMemoryStorage(): Storage {
   const map = new Map<string, string>();
@@ -71,7 +73,7 @@ describe("resolveApiBaseUrl", () => {
     const storage = createMemoryStorage();
     expect(
       resolveApiBaseUrl({ storage, search: "", buildTimeUrl: "", mode: "staging" })
-    ).toBe(STAGING_API_BASE_URL);
+    ).toBe(DEFAULT_STAGING_API_BASE_URL);
   });
 
   it("uses cursor-sync.com staging API when hostname matches", () => {
@@ -79,7 +81,7 @@ describe("resolveApiBaseUrl", () => {
       defaultApiBaseForMode("staging", "staging.cursor-sync.com")
     ).toBe(CURSOR_SYNC_STAGING_API_BASE_URL);
     expect(defaultApiBaseForMode("staging", "staging.sync.bergamota.dev")).toBe(
-      STAGING_API_BASE_URL
+      DEFAULT_STAGING_API_BASE_URL
     );
   });
 
