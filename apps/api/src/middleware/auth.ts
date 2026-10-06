@@ -1,5 +1,5 @@
 import { createMiddleware } from "hono/factory";
-import { verifySessionToken } from "../lib/session.js";
+import { verifyActiveSessionToken } from "../lib/session-revocation.js";
 
 export type AuthVariables = {
   userId: string;
@@ -15,7 +15,7 @@ export const requireAuth = createMiddleware<{ Variables: AuthVariables }>(
 
     const token = header.slice("Bearer ".length);
     try {
-      const payload = verifySessionToken(token);
+      const payload = await verifyActiveSessionToken(token);
       c.set("userId", payload.sub);
       c.set("email", payload.email);
       await next();

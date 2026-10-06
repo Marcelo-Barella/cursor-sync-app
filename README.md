@@ -70,6 +70,8 @@ Uses `apps/web/.env.staging` (`VITE_API_URL=https://api-staging-sync.bergamota.d
 | POST | `/auth/signup` | `{ "email", "password" }` → `{ "token" }` |
 | POST | `/auth/login` | `{ "email", "password" }` → `{ "token" }` |
 | POST | `/auth/token` | `{ "code" }` → `{ "token" }` (one-time login code from extension flow) |
+| POST | `/auth/logout` | `Authorization: Bearer <token>` → `204` (revokes session JWT; idempotent) |
+| POST | `/auth/session-revoke` | Alias of `POST /auth/logout` |
 | POST | `/login/code` | `Authorization: Bearer <token>`, `{ "redirect_uri", "state"? }` → `{ "code", "redirect_uri", "state"? }` |
 | GET | `/auth/me` | `Authorization: Bearer <token>` → `{ "id", "email", "secrets_version" }` |
 
@@ -112,7 +114,9 @@ Login passwords use argon2id only (`apps/api/src/lib/password.ts`). AES-256-GCM 
 
 ### Session model
 
-Auth uses **JWT bearer tokens** (7-day expiry). There is no server-side logout endpoint; clients discard the token. A future slice may add opaque sessions with `POST /auth/logout`.
+Auth uses **JWT bearer tokens** (7-day expiry). Revocation is tracked server-side: `POST /auth/logout` (or `POST /auth/session-revoke`) stores a SHA-256 hash of the bearer token in `revoked_session_tokens` until the JWT’s `exp`. After logout, protected routes return `401` for that token. Other sessions for the same user remain valid.
+
+Short-lived R2 credentials already minted via `POST /v1/storage/credentials` remain usable until their own TTL; logout does not revoke them.
 
 Send the token as:
 
