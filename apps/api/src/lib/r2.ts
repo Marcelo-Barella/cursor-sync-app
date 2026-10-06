@@ -1,3 +1,5 @@
+import { isRelativePlaintextObjectKey } from "./plaintext-object-keys.js";
+
 export type R2Config = {
   accountId: string;
   bucket: string;
@@ -53,13 +55,21 @@ export type MintedCredentials = {
   expiresAt: string;
 };
 
-export async function deleteUserObjects(
-  config: R2Config,
-  userId: string,
-  relativeKeys: string[]
-): Promise<void> {
-  const { S3Client, DeleteObjectsCommand } = await import("@aws-sdk/client-s3");
-  const client = new S3Client({
+export type PlaintextObjectDeleteStatus = "deleted" | "not_found" | "failed";
+
+export type PlaintextObjectDeleteResult = {
+  key: string;
+  status: PlaintextObjectDeleteStatus;
+  reason?: string;
+};
+
+function userObjectPrefix(userId: string): string {
+  return `users/${userId}/`;
+}
+
+async function createParentS3Client(config: R2Config) {
+  const { S3Client } = await import("@aws-sdk/client-s3");
+  return new S3Client({
     region: "auto",
     endpoint: `https://${config.accountId}.r2.cloudflarestorage.com`,
     credentials: {
@@ -67,19 +77,101 @@ export async function deleteUserObjects(
       secretAccessKey: config.parentSecretAccessKey,
     },
   });
+}
 
-  const prefix = `users/${userId}/`;
-  const objects = relativeKeys.map((key) => ({ Key: `${prefix}${key}` }));
+export async function listPlaintextUserObjects(
+  config: R2Config,
+  userId: string
+): Promise<string[]> {
+  const { ListObjectsV2Command } = await import("@aws-sdk/client-s3");
+  const client = await createParentS3Client(config);
+  const prefix = userObjectPrefix(userId);
+  const keys: string[] = [];
+  let continuationToken: string | undefined;
 
-  await client.send(
+  do {
+    const page = await client.send(
+      new ListObjectsV2Command({
+        Bucket: config.bucket,
+        Prefix: prefix,
+        ContinuationToken: continuationToken,
+      })
+    );
+    for (const object of page.Contents ?? []) {
+      if (!object.Key) {
+        continue;
+      }
+      const relative = object.Key.slice(prefix.length);
+      if (relative && isRelativePlaintextObjectKey(relative)) {
+        keys.push(relative);
+      }
+    }
+    continuationToken = page.IsTruncated ? page.NextContinuationToken : undefined;
+  } while (continuationToken);
+
+  return keys.sort();
+}
+
+type S3DeleteObjectsOutput = {
+  Deleted?: Array<{ Key?: string }>;
+  Errors?: Array<{ Key?: string; Code?: string; Message?: string }>;
+};
+
+export function mapDeleteObjectResults(
+  relativeKeys: string[],
+  objectKeys: string[],
+  response: S3DeleteObjectsOutput
+): PlaintextObjectDeleteResult[] {
+  const deleted = new Set(
+    (response.Deleted ?? [])
+      .map((entry) => entry.Key)
+      .filter((key): key is string => Boolean(key))
+  );
+  const errors = new Map<string, string>();
+  for (const err of response.Errors ?? []) {
+    if (err.Key) {
+      errors.set(err.Key, err.Code ?? err.Message ?? "delete_failed");
+    }
+  }
+
+  return relativeKeys.map((relativeKey, index) => {
+    const fullKey = objectKeys[index]!;
+    if (deleted.has(fullKey)) {
+      return { key: relativeKey, status: "deleted" as const };
+    }
+    const reason = errors.get(fullKey);
+    if (reason) {
+      const code = reason.toLowerCase();
+      if (code.includes("nosuchkey") || code.includes("not found")) {
+        return { key: relativeKey, status: "not_found" as const };
+      }
+      return { key: relativeKey, status: "failed" as const, reason };
+    }
+    return { key: relativeKey, status: "not_found" as const };
+  });
+}
+
+export async function deleteUserObjectsDetailed(
+  config: R2Config,
+  userId: string,
+  relativeKeys: string[]
+): Promise<PlaintextObjectDeleteResult[]> {
+  const { DeleteObjectsCommand } = await import("@aws-sdk/client-s3");
+  const client = await createParentS3Client(config);
+  const prefix = userObjectPrefix(userId);
+  const objectKeys = relativeKeys.map((key) => `${prefix}${key}`);
+
+  const response = await client.send(
     new DeleteObjectsCommand({
       Bucket: config.bucket,
       Delete: {
-        Objects: objects,
-        Quiet: true,
+        Objects: objectKeys.map((Key) => ({ Key })),
+        Quiet: false,
       },
     })
   );
+
+  return mapDeleteObjectResults(relativeKeys, objectKeys, response);
 }
 
 export async function mintTempCredentials(
