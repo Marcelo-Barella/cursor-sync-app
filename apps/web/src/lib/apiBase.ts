@@ -1,16 +1,11 @@
 import {
   CURSOR_SYNC_STAGING_API_BASE_URL,
   DEFAULT_LOCAL_API_BASE_URL,
-  DEFAULT_PRODUCTION_API_BASE_URL,
   DEFAULT_STAGING_API_BASE_URL,
   isCursorSyncStagingHost,
 } from "./defaults";
-import { messageForAuthErrorCategory } from "./authErrors";
 
 export const API_BASE_STORAGE_KEY = "cursor-sync-api-base-url";
-export const DEFAULT_API_BASE_URL = DEFAULT_PRODUCTION_API_BASE_URL;
-export const STAGING_API_BASE_URL = DEFAULT_STAGING_API_BASE_URL;
-export const LOCAL_API_PRESET = DEFAULT_LOCAL_API_BASE_URL;
 
 export const API_BASE_CHANGED_EVENT = "cursor-sync-api-base-changed";
 
@@ -25,10 +20,10 @@ export function defaultApiBaseForMode(
     if (host && isCursorSyncStagingHost(host)) {
       return CURSOR_SYNC_STAGING_API_BASE_URL;
     }
-    return STAGING_API_BASE_URL;
+    return DEFAULT_STAGING_API_BASE_URL;
   }
   if (mode === "development") {
-    return LOCAL_API_PRESET;
+    return DEFAULT_LOCAL_API_BASE_URL;
   }
   return "";
 }
@@ -88,13 +83,6 @@ export function readBuildTimeApiUrl(explicit?: string): string | undefined {
     return undefined;
   }
   return raw;
-}
-
-export function isBuildTimeApiBaseConfigured(options?: {
-  buildTimeUrl?: string;
-}): boolean {
-  const raw = readBuildTimeApiUrl(options?.buildTimeUrl);
-  return raw !== undefined && normalizeApiBaseUrl(raw) !== null;
 }
 
 export function resolveApiBaseUrl(options: ResolveApiBaseOptions = {}): string {
@@ -158,17 +146,6 @@ export function getApiBaseUrlForAuth(): string | null {
 
 export function isAuthApiBaseMissing(): boolean {
   return getApiBaseUrlForAuth() === null;
-}
-
-export function getApiBaseConfigurationError(): string | null {
-  if (isAuthApiBaseMissing()) {
-    return messageForAuthErrorCategory("empty_api_base");
-  }
-  return null;
-}
-
-export function isProductionLikeMode(mode: string = import.meta.env.MODE): boolean {
-  return mode === "production" || mode === "staging";
 }
 
 export function getStoredApiOverride(
