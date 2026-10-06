@@ -4,7 +4,6 @@ import { getMe, issueLoginCode } from "../lib/api";
 import {
   attemptExtensionHandoff,
   authPathWithOAuthQuery,
-  clearToken,
   readOAuthRedirectUri,
   readOAuthState,
   readToken,
@@ -20,6 +19,7 @@ import {
 import { AuthLayout } from "../components/AuthLayout";
 import { Button } from "../components/Button";
 import { LoginCodePanel } from "../components/LoginCodePanel";
+import { logout } from "../lib/logout";
 
 type CallbackView = "loading" | "return" | "missed" | "empty" | "error" | "invalid-link";
 
@@ -145,7 +145,7 @@ export function AuthCallbackPage() {
         setView("return");
       })
       .catch(() => {
-        clearToken();
+        void logout({ redirectToLogin: false });
         setView("error");
       });
 

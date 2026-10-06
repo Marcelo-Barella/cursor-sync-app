@@ -9,6 +9,7 @@ import {
   messageForAuthErrorCategory,
   type MappedAuthFormError,
 } from "../lib/authErrors";
+import { useAuth } from "../lib/authStore";
 import {
   authPathWithOAuthQuery,
   EXTENSION_AUTH_URI,
@@ -16,7 +17,6 @@ import {
   readOAuthStateFromSearchParams,
   resolveOAuthRedirectUri,
   saveOAuthParams,
-  saveToken,
 } from "../lib/auth";
 import { AuthLayout } from "../components/AuthLayout";
 import { Button } from "../components/Button";
@@ -37,6 +37,7 @@ function emptyApiBaseFormError(): MappedAuthFormError {
 
 export function AuthForm({ mode }: AuthFormProps) {
   const navigate = useNavigate();
+  const { setSession } = useAuth();
   const [searchParams] = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -128,11 +129,14 @@ export function AuthForm({ mode }: AuthFormProps) {
           warning: auth.verificationEmailWarning,
         });
       }
-      saveToken(auth.token);
-      if (redirectUri) {
-        saveOAuthParams(redirectUri, oauthState);
+      setSession(auth.token);
+      const handoffTarget = resolveOAuthRedirectUri(rawRedirectQuery);
+      if (handoffTarget) {
+        saveOAuthParams(handoffTarget, oauthState);
+        navigate(continuePath, { replace: true });
+        return;
       }
-      navigate(continuePath, { replace: true });
+      navigate("/app", { replace: true });
     } catch (caught) {
       setFormError(mapAuthApiError(caught));
     } finally {

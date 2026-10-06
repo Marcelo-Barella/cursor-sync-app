@@ -265,3 +265,40 @@ export async function issueLoginCode(
   });
   return parseJson<LoginCodeResponse>(response);
 }
+
+const LOGOUT_PATHS = ["/auth/logout", "/auth/session-revoke"] as const;
+const LOGOUT_TIMEOUT_MS = 2_000;
+
+export async function requestServerLogout(token: string | null): Promise<void> {
+  if (!token) {
+    return;
+  }
+  let base: string | null = null;
+  try {
+    base = requireApiBaseUrl();
+  } catch {
+    return;
+  }
+
+  for (const path of LOGOUT_PATHS) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), LOGOUT_TIMEOUT_MS);
+    try {
+      const response = await fetch(`${base}${path}`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        signal: controller.signal,
+      });
+      if (response.ok || response.status === 404) {
+        return;
+      }
+    } catch {
+      // Local logout must not depend on server revoke.
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+}

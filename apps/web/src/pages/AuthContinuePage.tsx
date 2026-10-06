@@ -3,7 +3,6 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { getMe, issueLoginCode, resendVerificationEmail } from "../lib/api";
 import {
   authPathWithOAuthQuery,
-  clearToken,
   readOAuthRedirectUri,
   readOAuthState,
   readOAuthStateFromSearchParams,
@@ -17,6 +16,7 @@ import {
   readEmailVerificationNotice,
 } from "../lib/emailVerificationNotice";
 import { savePendingLoginCode } from "../lib/loginHandoff";
+import { logout } from "../lib/logout";
 import { AuthLayout } from "../components/AuthLayout";
 import { Button } from "../components/Button";
 
@@ -78,7 +78,7 @@ export function AuthContinuePage() {
         setState("ready");
       })
       .catch(() => {
-        clearToken();
+        void logout({ redirectToLogin: false });
         setState("error");
       });
   }, [queryRedirectUri, redirectUri, oauthState]);
