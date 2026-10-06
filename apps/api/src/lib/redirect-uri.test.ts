@@ -1,32 +1,28 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import {
-  appendCodeToRedirectUri,
-  buildAuthCallbackRedirect,
-  isAllowedRedirectUri,
-} from "./redirect-uri.js";
+import { buildAuthCallbackRedirect, normalizeRedirectUri } from "./redirect-uri.js";
 
-describe("isAllowedRedirectUri", () => {
+describe("normalizeRedirectUri", () => {
   it("accepts cursor and vscode extension auth URIs (case-insensitive authority)", () => {
     assert.equal(
-      isAllowedRedirectUri("cursor://MarceloBarella.cursor-sync/auth"),
-      true
+      normalizeRedirectUri("cursor://MarceloBarella.cursor-sync/auth"),
+      "cursor://marcelobarella.cursor-sync/auth"
     );
     assert.equal(
-      isAllowedRedirectUri("vscode://marcelobarella.cursor-sync/auth"),
-      true
+      normalizeRedirectUri("vscode://marcelobarella.cursor-sync/auth"),
+      "vscode://marcelobarella.cursor-sync/auth"
     );
     assert.equal(
-      isAllowedRedirectUri("cursor://MarceloBarella.cursor-sync/auth/"),
-      true
+      normalizeRedirectUri("cursor://MarceloBarella.cursor-sync/auth/"),
+      "cursor://marcelobarella.cursor-sync/auth"
     );
   });
 
   it("rejects invalid redirect URIs with 400-worthy inputs", () => {
-    assert.equal(isAllowedRedirectUri("https://MarceloBarella.cursor-sync/auth"), false);
-    assert.equal(isAllowedRedirectUri("cursor://evil.cursor-sync/auth"), false);
-    assert.equal(isAllowedRedirectUri("cursor://MarceloBarella.cursor-sync/other"), false);
-    assert.equal(isAllowedRedirectUri(""), false);
+    assert.equal(normalizeRedirectUri("https://MarceloBarella.cursor-sync/auth"), null);
+    assert.equal(normalizeRedirectUri("cursor://evil.cursor-sync/auth"), null);
+    assert.equal(normalizeRedirectUri("cursor://MarceloBarella.cursor-sync/other"), null);
+    assert.equal(normalizeRedirectUri(""), null);
   });
 });
 
@@ -39,14 +35,5 @@ describe("buildAuthCallbackRedirect", () => {
     );
     assert.match(uri, /code=a%2Bb%2Fc/);
     assert.match(uri, /state=opaque/);
-  });
-
-  it("matches appendCodeToRedirectUri behavior", () => {
-    const code = "test-code";
-    const base = "vscode://MarceloBarella.cursor-sync/auth";
-    assert.equal(
-      appendCodeToRedirectUri(base, code, "s1"),
-      buildAuthCallbackRedirect(base, code, "s1")
-    );
   });
 });

@@ -4,8 +4,8 @@ import { pool } from "../db/pool.js";
 import { createLoginCode } from "../lib/login-codes.js";
 import { verifyLoginPassword } from "../lib/password.js";
 import {
-  appendCodeToRedirectUri,
-  isAllowedRedirectUri,
+  buildAuthCallbackRedirect,
+  normalizeRedirectUri,
 } from "../lib/redirect-uri.js";
 import { requireAuth, type AuthVariables } from "../middleware/auth.js";
 
@@ -139,7 +139,7 @@ loginRoutes.post("/login/code", requireAuth, async (c) => {
   }
 
   const { redirect_uri, state } = parsed.data;
-  if (!isAllowedRedirectUri(redirect_uri)) {
+  if (!normalizeRedirectUri(redirect_uri)) {
     return c.json({ error: "Invalid request" }, 400);
   }
 
@@ -154,7 +154,7 @@ loginRoutes.post("/login/code", requireAuth, async (c) => {
 
 loginRoutes.get("/login", (c) => {
   const redirectUri = c.req.query("redirect_uri") ?? "";
-  if (!isAllowedRedirectUri(redirectUri)) {
+  if (!normalizeRedirectUri(redirectUri)) {
     return c.html(invalidRedirectHtml(), 400);
   }
   return c.html(loginFormHtml(redirectUri));
@@ -163,10 +163,10 @@ loginRoutes.get("/login", (c) => {
 loginRoutes.get("/login/success", (c) => {
   const code = c.req.query("code") ?? "";
   const redirectUri = c.req.query("redirect_uri") ?? "";
-  if (!code || !isAllowedRedirectUri(redirectUri)) {
+  if (!code || !normalizeRedirectUri(redirectUri)) {
     return c.html(invalidRedirectHtml(), 400);
   }
-  const redirectWithCode = appendCodeToRedirectUri(redirectUri, code);
+  const redirectWithCode = buildAuthCallbackRedirect(redirectUri, code);
   return c.html(loginSuccessHtml(redirectWithCode, code));
 });
 
@@ -184,7 +184,7 @@ loginRoutes.post("/login", async (c) => {
       : "";
 
   if (!parsed.success) {
-    if (!redirectUri || !isAllowedRedirectUri(redirectUri)) {
+    if (!redirectUri || !normalizeRedirectUri(redirectUri)) {
       if (wantsJson(c) || isJsonRequest) {
         return c.json({ error: "Invalid request" }, 400);
       }
@@ -202,7 +202,7 @@ loginRoutes.post("/login", async (c) => {
     redirect_uri: validRedirectUri,
     state,
   } = parsed.data;
-  if (!isAllowedRedirectUri(validRedirectUri)) {
+  if (!normalizeRedirectUri(validRedirectUri)) {
     if (wantsJson(c) || isJsonRequest) {
       return c.json({ error: "Invalid request" }, 400);
     }
@@ -221,7 +221,7 @@ loginRoutes.post("/login", async (c) => {
   }
 
   const code = await createLoginCode(user.id);
-  const redirectWithCode = appendCodeToRedirectUri(validRedirectUri, code, state);
+  const redirectWithCode = buildAuthCallbackRedirect(validRedirectUri, code, state);
 
   if (wantsJson(c) || isJsonRequest) {
     return c.json({
