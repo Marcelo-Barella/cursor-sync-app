@@ -3,9 +3,9 @@ import { randomUUID } from "node:crypto";
 import { after, before, describe, it } from "node:test";
 import { pool } from "../db/pool.js";
 import { hashPassword } from "../lib/password.js";
+import { hashSessionToken } from "../lib/session-revocation.js";
 import { createSessionToken } from "../lib/session.js";
 import { app } from "../test/app.js";
-import { ensureRevokedSessionTokensTable } from "../test/revoked-session-tokens-schema.js";
 
 const databaseUrl = process.env.DATABASE_URL;
 
@@ -18,7 +18,6 @@ describe("POST /auth/logout", { skip: !databaseUrl }, () => {
 
   before(async () => {
     process.env.JWT_SECRET ??= "test-jwt-secret-with-enough-length";
-    await ensureRevokedSessionTokensTable(pool);
 
     userEmail = `logout-${randomUUID()}@example.com`;
     const otherEmail = `logout-other-${randomUUID()}@example.com`;
@@ -67,27 +66,69 @@ describe("POST /auth/logout", { skip: !databaseUrl }, () => {
     assert.equal(response.status, 204);
   });
 
+  it("rejects uppercase token_hash via CHECK constraint", async () => {
+    const upper = "A".repeat(64);
+    await assert.rejects(
+      pool.query(
+        `INSERT INTO revoked_session_tokens (token_hash, user_id, expires_at)
+         VALUES ($1, $2, now() + interval '1 hour')`,
+        [upper, userId]
+      )
+    );
+  });
+
+  it("purges expired rows on the next logout", async () => {
+    const expiredHash = "b".repeat(64);
+    await pool.query(
+      `INSERT INTO revoked_session_tokens (token_hash, user_id, expires_at)
+       VALUES ($1, $2, now() - interval '1 hour')`,
+      [expiredHash, userId]
+    );
+
+    const freshToken = createSessionToken(userId, userEmail);
+    const logout = await app.request("/auth/logout", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${freshToken}` },
+    });
+    assert.equal(logout.status, 204);
+
+    const expiredRow = await pool.query(
+      `SELECT 1 FROM revoked_session_tokens WHERE token_hash = $1`,
+      [expiredHash]
+    );
+    assert.equal(expiredRow.rowCount, 0);
+
+    const freshHash = hashSessionToken(freshToken);
+    const revokedRow = await pool.query(
+      `SELECT 1 FROM revoked_session_tokens WHERE token_hash = $1`,
+      [freshHash]
+    );
+    assert.equal(revokedRow.rowCount, 1);
+  });
+
   it("revokes the session and rejects it on protected routes", async () => {
+    const token = createSessionToken(userId, userEmail);
+
     const configsBefore = await app.request("/configs", {
-      headers: { Authorization: `Bearer ${sessionToken}` },
+      headers: { Authorization: `Bearer ${token}` },
     });
     assert.equal(configsBefore.status, 200);
 
     const logout = await app.request("/auth/logout", {
       method: "POST",
-      headers: { Authorization: `Bearer ${sessionToken}` },
+      headers: { Authorization: `Bearer ${token}` },
     });
     assert.equal(logout.status, 204);
 
     const configsAfter = await app.request("/configs", {
-      headers: { Authorization: `Bearer ${sessionToken}` },
+      headers: { Authorization: `Bearer ${token}` },
     });
     assert.equal(configsAfter.status, 401);
 
     const storageAfter = await app.request("/v1/storage/credentials", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${sessionToken}`,
+        Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
       body: "{}",
@@ -96,17 +137,18 @@ describe("POST /auth/logout", { skip: !databaseUrl }, () => {
 
     const logoutAgain = await app.request("/auth/logout", {
       method: "POST",
-      headers: { Authorization: `Bearer ${sessionToken}` },
+      headers: { Authorization: `Bearer ${token}` },
     });
     assert.equal(logoutAgain.status, 204);
   });
 
   it("leaves another session for the same user valid", async () => {
+    const firstToken = createSessionToken(userId, userEmail);
     const secondToken = createSessionToken(userId, userEmail);
 
     const logoutFirst = await app.request("/auth/logout", {
       method: "POST",
-      headers: { Authorization: `Bearer ${sessionToken}` },
+      headers: { Authorization: `Bearer ${firstToken}` },
     });
     assert.equal(logoutFirst.status, 204);
 

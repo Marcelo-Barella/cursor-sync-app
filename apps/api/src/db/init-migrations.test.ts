@@ -82,7 +82,7 @@ async function dropIsolatedDatabase(
   }
 }
 
-describe("postgres init scripts 001-004", { skip: !databaseUrl }, () => {
+describe("postgres init scripts 001-005", { skip: !databaseUrl }, () => {
   const dbName = `cursor_sync_init_${Date.now()}`;
   let adminClient: pg.Client;
   let pool: pg.Pool;
@@ -104,7 +104,7 @@ describe("postgres init scripts 001-004", { skip: !databaseUrl }, () => {
     }
   });
 
-  it("applies 001-003 then 004 twice idempotently", async () => {
+  it("applies 001-005 idempotently", async () => {
     const bootstrap = new pg.Client({
       connectionString: databaseUrl!.replace(/\/[^/]+$/, `/${dbName}`),
     });
@@ -115,12 +115,13 @@ describe("postgres init scripts 001-004", { skip: !databaseUrl }, () => {
       "002_login_codes.sql",
       "003_email_verification.sql",
       "004_e2e_keys.sql",
+      "005_revoked_session_tokens.sql",
     ];
     for (const file of files) {
       await runSqlFile(bootstrap, path.join(initDir, file));
     }
     await runSqlFile(bootstrap, path.join(initDir, "004_e2e_keys.sql"));
-    await runSqlFile(bootstrap, path.join(initDir, "004_e2e_keys.sql"));
+    await runSqlFile(bootstrap, path.join(initDir, "005_revoked_session_tokens.sql"));
     await bootstrap.end();
   });
 
