@@ -101,8 +101,6 @@ export const CHANGELOG_RELEASES: readonly ChangelogRelease[] = [
   },
 ];
 
-export const LATEST_RELEASE_VERSION = CHANGELOG_RELEASES[0]?.version ?? "0.0.0";
-
 export function missionForReleaseIndex(releaseIndex: number): number {
   return CHANGELOG_RELEASES.length - 1 - releaseIndex;
 }
