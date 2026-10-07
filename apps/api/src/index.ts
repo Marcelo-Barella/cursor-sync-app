@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { pingDatabase } from "./db/pool.js";
 import { authRoutes } from "./routes/auth.js";
+import { changelogRoutes } from "./routes/changelog.js";
 import { configsRoutes } from "./routes/configs.js";
 import { keysRoutes } from "./routes/keys.js";
 import { loginRoutes } from "./routes/login.js";
@@ -38,6 +39,7 @@ app.get("/health", async (c) => {
 });
 
 app.route("/auth", authRoutes);
+app.route("/changelog", changelogRoutes);
 app.route("/configs", configsRoutes);
 app.route("/v1/keys", keysRoutes);
 app.route("/v1/storage", storageRoutes);
