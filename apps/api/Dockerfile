@@ -1,5 +1,8 @@
 FROM node:22-alpine AS build
 
+ARG GIT_SHA=unknown
+ARG APP_VERSION=0.1.0
+
 RUN apk add --no-cache python3 make g++
 
 WORKDIR /app
@@ -18,6 +21,11 @@ RUN npm run build -w @cursor-sync/api
 FROM node:22-alpine
 
 WORKDIR /app
+
+ARG GIT_SHA=unknown
+ARG APP_VERSION=0.1.0
+ENV GIT_SHA=$GIT_SHA
+ENV APP_VERSION=$APP_VERSION
 
 ENV NODE_ENV=production
 ENV PORT=8100
