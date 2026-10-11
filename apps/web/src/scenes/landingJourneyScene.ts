@@ -8,8 +8,10 @@ import { createFileSystemOrbits, type FileSystemOrbits } from "./fileSystemOrbit
 import { createGlowPlanet } from "./glowPlanet";
 import { createFileLabelSprite, loadLabelFont } from "./orbitFileLabel";
 import { createSceneStage, type Disposable } from "./sceneStage";
+import { createCloudStation } from "./cloudStation";
+import { storyFlightShot, type CameraShot } from "./journeyFlightShot";
 import { createSyncRockets } from "./syncRockets";
-import { createCloudStation, createPassphraseKey } from "./syncStoryProps";
+import { createPassphraseKey } from "./syncStoryProps";
 
 export type JourneyState = {
   intro: number;
@@ -29,8 +31,6 @@ export type LandingJourneyScene = {
   dispose: () => void;
 };
 
-type CameraShot = { position: THREE.Vector3; look: THREE.Vector3 };
-
 type StoryWorldUpdate = (
   deltaSeconds: number,
   elapsedSeconds: number,
@@ -46,12 +46,6 @@ const STATION_POSITION = new THREE.Vector3(0.4, 1.7, -0.8);
 const MACHINE_TWO_POSITION = new THREE.Vector3(4.4, -0.4, 0);
 const HERO_SHOT: CameraShot = { position: new THREE.Vector3(0, 1.4, 10.5), look: new THREE.Vector3(0, 0.9, 0) };
 const HERO_SHOT_ASPECT = 0.95;
-const STORY_SHOTS: readonly CameraShot[] = [
-  { position: new THREE.Vector3(-2.2, 1.1, 8.4), look: new THREE.Vector3(-2.4, 0.2, 0) },
-  { position: new THREE.Vector3(-1, 1.6, 10.2), look: new THREE.Vector3(-1.2, 0.6, 0) },
-  { position: new THREE.Vector3(0.4, 1.8, 13.6), look: new THREE.Vector3(0.4, 0.4, 0) },
-];
-const STORY_SHOT_ASPECTS: readonly number[] = [1.1, 1.4, 1.75];
 const FOCUS_DISTANCE = 1.5;
 const FOCUS_LIFT = 0.35;
 const FOCUS_LOOK_SHIFT = 0.32;
@@ -63,8 +57,6 @@ const shotMatrix = new THREE.Matrix4();
 const shotQuaternion = new THREE.Quaternion();
 const focusOutward = new THREE.Vector3();
 const focusRight = new THREE.Vector3();
-const storyFromShot = createShot();
-const storyToShot = createShot();
 
 function createShot(): CameraShot {
   return { position: new THREE.Vector3(), look: new THREE.Vector3() };
@@ -98,17 +90,6 @@ function aimFocusShot(itemPoint: THREE.Vector3, planetCenter: THREE.Vector3, tar
   return target;
 }
 
-function storyShotAt(story: number, viewAspect: number, target: CameraShot): CameraShot {
-  const segment = THREE.MathUtils.clamp(story - 1, 0, STORY_SHOTS.length - 1);
-  const fromIndex = Math.min(Math.floor(segment), STORY_SHOTS.length - 2);
-  const blend = easeInOut(segment - fromIndex);
-  fitShot(STORY_SHOTS[fromIndex], STORY_SHOT_ASPECTS[fromIndex], viewAspect, storyFromShot);
-  fitShot(STORY_SHOTS[fromIndex + 1], STORY_SHOT_ASPECTS[fromIndex + 1], viewAspect, storyToShot);
-  target.position.lerpVectors(storyFromShot.position, storyToShot.position, blend);
-  target.look.lerpVectors(storyFromShot.look, storyToShot.look, blend);
-  return target;
-}
-
 function createLockRing(disposables: Disposable[]): THREE.Mesh<THREE.TorusGeometry, THREE.MeshBasicMaterial> {
   const lockGeometry = new THREE.TorusGeometry(1.3, 0.012, 8, 128);
   const lockMaterial = new THREE.MeshBasicMaterial({
@@ -128,6 +109,7 @@ function createStoryWorld(
   machineOne: THREE.Group,
   machineOneOrbits: FileSystemOrbits,
   disposables: Disposable[],
+  flightFocus: THREE.Vector3,
 ): StoryWorldUpdate {
   const station = createCloudStation(STATION_POSITION, SYNCED_FILES.length, disposables);
   const machineTwo = new THREE.Group();
@@ -179,6 +161,7 @@ function createStoryWorld(
     });
     station.update(copyPresence, uploadLeg, elapsedSeconds, motionScale);
     rockets.update(uploadLeg, downloadLeg, elapsedSeconds, motionScale);
+    rockets.focusPoint(uploadLeg, downloadLeg, flightFocus);
     machineTwoPlanet.update(elapsedSeconds, motionScale, appear);
     machineTwoOrbits.update(deltaSeconds, motionScale, cameraPoint);
   };
@@ -210,7 +193,8 @@ export async function createLandingJourneyScene(
   const planetOccluder = new THREE.Mesh(occluderGeometry, occluderMaterial);
   machineOne.add(machineOnePlanet.group, machineOneOrbits.group, planetOccluder);
   scene.add(machineOne);
-  const updateStoryWorld = createStoryWorld(scene, state, machineOne, machineOneOrbits, disposables);
+  const flightFocus = new THREE.Vector3();
+  const updateStoryWorld = createStoryWorld(scene, state, machineOne, machineOneOrbits, disposables, flightFocus);
 
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
@@ -272,7 +256,7 @@ export async function createLandingJourneyScene(
     if (focusPoint) {
       blendCameraToward(camera, aimFocusShot(focusPoint, machineOne.position, focusShot), state.focus, FOCUS_ARC_LIFT);
     }
-    if (handoff > 0) blendCameraToward(camera, storyShotAt(state.story, stage.aspect(), storyShot), handoff, 0);
+    if (handoff > 0) blendCameraToward(camera, storyFlightShot(state.story, stage.aspect(), flightFocus, storyShot), handoff, 0);
   });
 
   return {

@@ -1,0 +1,33 @@
+---
+description: Conventions for Three.js + GSAP scene components in the web app
+globs: apps/web/src/scenes/**,apps/web/src/components/HowItSyncsSection.tsx,apps/web/src/components/WhatElseSection.tsx,apps/web/src/components/AuthLayout.tsx,apps/web/src/components/FileFocusCard.tsx,apps/web/src/pages/LandingPage.tsx,apps/web/src/pages/ChangelogPage.tsx,apps/web/src/lib/useHeroFileFocus.ts,apps/web/src/lib/useStoryAutoplay.ts
+alwaysApply: false
+---
+
+# Three.js scenes (apps/web)
+
+- Scenes are plain TS modules in `apps/web/src/scenes/` (no React). Each exports `create<Name>Scene(host, state)` and returns `{ state, dispose }`, or `null` when WebGL is unavailable.
+- Mount scenes only with `useLazyScene(hostRef, loader)`. The loader uses a dynamic `import()` so `three` stays out of the main chunk. Keep the loader stable: a module-level const, or `useCallback` with `[]`.
+- `createSceneStage` owns the renderer, camera, resize, offscreen pause, and disposal. Push every geometry, material, and texture into `stage.disposables`. Do not dispose `Sprite` geometry (three shares it).
+- Pass the state objects (`JourneyState`, `AuthOrbitState`, `RocketFlight`) by reference. GSAP tweens change them, and the scene reads them every frame. Do not copy them.
+- For a value that scroll changes every frame, use `gsap.quickTo`. Do not use `gsap.to(..., { overwrite: true })`: each new tween kills the previous one before it renders, and the value never moves while scrolling.
+- Wrap ScrollTrigger and scroll-driven GSAP work in `gsap.context()` and call `revert()` in cleanup. Tweens on a mounted scene's state and `Flip` animations that must keep their end pose use `kill()` (or `progress(1).kill()`), because `revert()` writes the start values back. Do not add `@gsap/react`.
+- If WebGL fails, `useLazyScene` sets `data-webgl="off"` on the host. Give each host a CSS gradient fallback for that state.
+- Respect `prefers-reduced-motion`: skip intro timelines and freeze time-based motion.
+- Canvas textures built from `THREE.Color` must call `convertLinearToSRGB()` before they write pixels, or colors go dark and red. Keep `NeutralToneMapping` so the bergamot orange keeps its hue.
+- Transparent lines and overlays need `depthWrite: false`, or they cut visible gaps in additive glows.
+- Custom `ShaderMaterial` fragments must end with `#include <colorspace_fragment>`.
+- Use `THREE.Timer` and `renderer.setAnimationLoop`, not `requestAnimationFrame` plus `Clock`.
+- The launch rocket frame and gantry are solid strut meshes. Do not replace them with `WireframeGeometry`. The frame grows by a world clip plane from the bell, so members do not stretch.
+- The launch planet uses `createBergamotGroundMaterial`. One relief function drives displacement, normals, and albedo. The pad direction stays flat. `?planetField=1|2|3|4` shows height, slope, normal, and albedo. `?planetExaggerate=1` and `?planetSeed=` change amplitude and seed.
+- Gas-giant cloud motion uses `attachBandAdvection`: latitude-dependent map UV shift. Do not spin the surface mesh. That drags the terminator with the clouds. Tilt the body group so the limb matches the surface.
+- Orbit items come from `SYNCED_FILES` (`lib/syncedFiles.ts`) through `createFileSystemOrbits`. One seed fixes the lanes in `fileOrbitLayout.ts`. Forward is the analytic lane tangent, up is the planet radial. Follow that frame with `quaternion.slerp` and `1 - exp(-lambda * dt)`, then roll around local X. Spin each dashed lane ring on its normal with the lane mean anomaly (`LineDashedMaterial` in three r186 has no `dashOffset`).
+- A file body is a white page with the VS Code glyph for its extension: `{ }` for `.json`, the markdown mark for `.md`, and a folded page when there is no extension. Folder meshes stay the tabbed box. Plain file-name labels do not draw a status dot.
+- File labels sit on the camera-facing orbit binormal. When the label point's view-plane distance to the planet center is inside `LABEL_CLEARANCE_RADIUS` (1.85 radii), push it outward in that plane to that radius so it clears the disk.
+- The landing journey camera takes one pose per frame: `placeCamera(hero)`, then `blendCameraToward(focus)`, then `blendCameraToward(story)`. Position uses lerp, view uses slerp. Do not add a second smoother. The story shot holds the establishing view until the upload leg, rides the flying-rocket centroid through both legs, and returns to the wide shot at the end of the download leg.
+- The cloud station is the ISS-style mesh in `cloudStation.ts`: truss, eight solar wings, radiators, module stack, and berths. Rocket docks are the berth world positions. Solar gimbals turn on their own. Do not spin the station group.
+- Rocket travel is a pure function of story progress: `rocketLegProgress(storyLegProgress(story, leg), index, count, ROCKET_STAGGER)`. Keep no time state in travel, so scrubbing backward reverses cleanly. Only exhaust flicker reads elapsed time. Rocket meshes and materials live in `syncRocketBody.ts`; flight, paths, and trails live in `syncRockets.ts`.
+- Story autoplay status changes only through `nextAutoplayStatus` (`lib/syncStoryTimeline.ts`). The play/pause button carries `data-autoplay-control`; its input does not count as user input.
+- Create the journey pin ScrollTrigger before any ScrollTrigger below it (the maker reveal), so later starts include the pin spacing.
+- The auth success `Flip` expansion runs only when the auth scene handle from `useLazyScene` exists. Without it (WebGL off, still loading, or reduced motion) the success panel replaces the form card in place. Do not read `data-webgl` for this: it is set only after the loader fails.
+- React and `lib/` files import scene modules with `import type` only. The loader's dynamic `import()` is the only runtime import, so `three` stays out of the main chunk.

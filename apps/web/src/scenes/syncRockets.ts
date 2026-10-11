@@ -16,6 +16,7 @@ export type SyncRoute = {
 export type SyncRockets = {
   group: THREE.Group;
   update: (uploadLeg: number, downloadLeg: number, elapsedSeconds: number, motionScale: number) => void;
+  focusPoint: (uploadLeg: number, downloadLeg: number, target: THREE.Vector3) => THREE.Vector3;
 };
 
 type RocketLegPath = { start: THREE.Vector3; control: THREE.Vector3; end: THREE.Vector3 };
@@ -43,6 +44,7 @@ const arcNormal = new THREE.Vector3();
 const rocketSide = new THREE.Vector3();
 const rocketBasis = new THREE.Matrix4();
 const trailPoint = new THREE.Vector3();
+const focusSample = new THREE.Vector3();
 
 function bezierPoint(path: RocketLegPath, progress: number, target: THREE.Vector3): THREE.Vector3 {
   const remaining = 1 - progress;
@@ -154,6 +156,25 @@ export function createSyncRockets(
         rocket.exhaust.scale.setScalar(0.02 + 0.16 * envelope * flicker);
         updateTrail(rocket.trail, path, flight, envelope);
       });
+    },
+    focusPoint: (uploadLeg, downloadLeg, target) => {
+      const downloading = downloadLeg > 0;
+      const leg = downloading ? downloadLeg : uploadLeg;
+      target.set(0, 0, 0);
+      let flyingCount = 0;
+      rockets.forEach((rocket, rocketIndex) => {
+        const flight = rocketLegProgress(leg, rocketIndex, rocketCount, ROCKET_STAGGER);
+        if (flight <= 0 || flight >= 1) return;
+        const path = downloading ? rocket.downloadPath : rocket.uploadPath;
+        bezierPoint(path, easeInOut(flight), focusSample);
+        target.add(focusSample);
+        flyingCount += 1;
+      });
+      if (flyingCount > 0) return target.multiplyScalar(1 / flyingCount);
+      const parkedRocket = rockets[0];
+      if (!parkedRocket) return target;
+      const parkedPath = downloading ? parkedRocket.downloadPath : parkedRocket.uploadPath;
+      return bezierPoint(parkedPath, leg >= 1 ? 1 : 0, target);
     },
   };
 }

@@ -18,12 +18,6 @@ export type SyncRelay = {
   update: (transit: number, elapsedSeconds: number) => void;
 };
 
-export type CloudStation = {
-  group: THREE.Group;
-  docks: readonly THREE.Vector3[];
-  update: (copyPresence: readonly number[], glow: number, elapsedSeconds: number, motionScale: number) => void;
-};
-
 const R2_POSITION = new THREE.Vector3(3.4, 1.3, -0.4);
 const PEER_POSITION = new THREE.Vector3(6.5, -0.45, 0);
 const PEER_ORBIT_RADIUS = 1.05;
@@ -31,7 +25,6 @@ const UPLOAD_ARC_LIFT = new THREE.Vector3(0, 1.4, 0);
 const DOWNLOAD_ARC_LIFT = new THREE.Vector3(0, 1.1, 0);
 const easeInOut = gsap.parseEase("power2.inOut");
 const easeOutBack = gsap.parseEase("back.out(1.7)");
-const STATION_RING_RADIUS = 0.62;
 
 function quadraticPoint(
   start: THREE.Vector3,
@@ -188,64 +181,6 @@ export function createSyncRelay(disposables: Disposable[]): SyncRelay {
       peerMachine.rotation.y = elapsedSeconds * 0.1;
       peerKey.scale.setScalar(0.75 * easeOutBack(THREE.MathUtils.clamp((transit - 0.72) / 0.28, 0, 1)));
       peerKey.rotation.y = elapsedSeconds * 0.8;
-    },
-  };
-}
-
-export function createCloudStation(position: THREE.Vector3, dockCount: number, disposables: Disposable[]): CloudStation {
-  const hubGeometry = new THREE.CylinderGeometry(0.34, 0.34, 0.12, 40);
-  const hubMaterial = new THREE.MeshStandardMaterial({
-    color: "#201f22",
-    emissive: "#38bdf8",
-    emissiveIntensity: 0.1,
-    metalness: 0.6,
-    roughness: 0.35,
-  });
-  const ringGeometry = new THREE.TorusGeometry(STATION_RING_RADIUS, 0.016, 8, 96);
-  const ringMaterial = new THREE.MeshBasicMaterial({
-    color: "#38bdf8",
-    transparent: true,
-    opacity: 0.3,
-    blending: THREE.AdditiveBlending,
-    depthWrite: false,
-  });
-  const copyGeometry = new THREE.BoxGeometry(0.07, 0.09, 0.012);
-  const copyMaterial = new THREE.MeshStandardMaterial({ color: "#ffa366", emissive: "#e87a2e", emissiveIntensity: 1.1 });
-  disposables.push(hubGeometry, hubMaterial, ringGeometry, ringMaterial, copyGeometry, copyMaterial);
-
-  const hub = new THREE.Mesh(hubGeometry, hubMaterial);
-  const ring = new THREE.Mesh(ringGeometry, ringMaterial);
-  ring.rotation.x = Math.PI / 2;
-  const deck = new THREE.Group();
-  deck.rotation.x = 0.35;
-  deck.add(hub, ring);
-  const copies = Array.from({ length: dockCount }, (_, dockIndex) => {
-    const dockAngle = (dockIndex / dockCount) * Math.PI * 2;
-    const copy = new THREE.Mesh(copyGeometry, copyMaterial);
-    copy.position.set(Math.cos(dockAngle) * STATION_RING_RADIUS, 0.08, Math.sin(dockAngle) * STATION_RING_RADIUS);
-    copy.rotation.y = -dockAngle;
-    deck.add(copy);
-    return copy;
-  });
-  const label = createFileLabelSprite("cloud station", "node", 0.2, disposables);
-  label.position.y = -0.62;
-  const group = new THREE.Group();
-  group.position.copy(position);
-  group.add(deck, label);
-  group.updateMatrixWorld(true);
-
-  return {
-    group,
-    docks: copies.map((copy) => copy.getWorldPosition(new THREE.Vector3())),
-    update: (copyPresence, glow, elapsedSeconds, motionScale) => {
-      hub.rotation.y = elapsedSeconds * 0.4 * motionScale;
-      ringMaterial.opacity = 0.3 + 0.55 * glow;
-      hubMaterial.emissiveIntensity = 0.1 + 0.9 * glow;
-      copies.forEach((copy, dockIndex) => {
-        const presence = copyPresence[dockIndex];
-        copy.visible = presence > 0.01;
-        copy.scale.setScalar(Math.max(presence, 0.001));
-      });
     },
   };
 }
