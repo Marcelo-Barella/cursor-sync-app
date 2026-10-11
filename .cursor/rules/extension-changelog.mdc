@@ -1,6 +1,6 @@
 ---
 description: Extension changelog flow from GitHub CHANGELOG.md through GET /changelog to the changelog page and sign-in badge
-globs: apps/api/src/lib/extension-changelog*.ts,apps/api/src/routes/changelog.ts,apps/web/src/lib/changelogReleases.ts,apps/web/src/lib/useExtensionChangelog.ts,apps/web/src/pages/ChangelogPage.tsx,apps/web/src/components/AuthLayout.tsx
+globs: apps/api/src/lib/extension-changelog*.ts,apps/api/src/routes/changelog.ts,apps/web/src/lib/changelogReleases.ts,apps/web/src/lib/formatLaunchNote.ts,apps/web/src/lib/useExtensionChangelog.ts,apps/web/src/pages/ChangelogPage.tsx,apps/web/src/components/AuthLayout.tsx
 alwaysApply: false
 ---
 
@@ -9,6 +9,6 @@ alwaysApply: false
 - The only release source is `CHANGELOG.md` on `main` of `Marcelo-Barella/cursor-sync`. Do not add a hard-coded or fallback release list to the web app.
 - The API owns parsing and caching: `parseExtensionChangelog` in `apps/api/src/lib/extension-changelog.ts`, the 10-minute single-flight cache in `extension-changelog-cache.ts`, the 5-second GitHub fetch in `extension-changelog-source.ts`, and `GET /changelog` in `routes/changelog.ts`.
 - On a failed refresh the cache keeps its copy. With no copy, `GET /changelog` returns `503` and `{ "error": "changelog_unavailable" }`.
-- The web app does not parse markdown, does not call GitHub, and does not cache the payload. Both consumers use `useExtensionChangelog()`.
+- The web app does not split releases, does not call GitHub, and does not cache the payload. Both consumers use `useExtensionChangelog()`. `formatLaunchNote` only styles item text: `**...**` and `*...*` become bold, and `` `...` `` becomes code.
 - Rocket phase and mission come from `rocketPositionForVersion` in `apps/web/src/lib/changelogReleases.ts`, not from the API. Ground is mission `-1`. Each row blends from its mission to the next row's `data-next-mission`.
 - The sign-in badge renders only when `latest` is a version string.

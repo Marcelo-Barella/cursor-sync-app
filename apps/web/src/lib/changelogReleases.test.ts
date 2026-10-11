@@ -3,6 +3,11 @@ import { rocketPositionForVersion } from "./changelogReleases";
 
 describe("rocketPositionForVersion", () => {
   it.each([
+    ["0.0.4", "assembly", "On the pad", 0],
+    ["0.2.0", "assembly", "On the pad", (2 / 7) * 2.6],
+    ["0.2.9", "assembly", "On the pad", (2 / 7) * 2.6],
+    ["0.4.1", "assembly", "On the pad", (4 / 7) * 2.6],
+    ["0.6.2", "assembly", "On the pad", (6 / 7) * 2.6],
     ["0.7.6", "assembly", "On the pad", 2.6],
     ["0.7.99", "assembly", "On the pad", 2.6],
     ["0.8.0", "liftoff", "Liftoff", 3.25],

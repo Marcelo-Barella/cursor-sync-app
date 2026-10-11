@@ -18,9 +18,18 @@ function compareVersions(left: string, right: string): number {
   return leftMajor - rightMajor || leftMinor - rightMinor || leftPatch - rightPatch;
 }
 
+const ASSEMBLY_DONE = 2.6;
+const LAST_ASSEMBLY_MINOR = 7;
+
+function assemblyMission(version: string): number {
+  const minor = Number(version.split(".")[1] ?? 0);
+  const step = Math.min(Math.max(Number.isFinite(minor) ? minor : 0, 0), LAST_ASSEMBLY_MINOR);
+  return (step / LAST_ASSEMBLY_MINOR) * ASSEMBLY_DONE;
+}
+
 export function rocketPositionForVersion(version: string): RocketPosition {
   if (compareVersions(version, "0.8.0") < 0) {
-    return { phase: "assembly", phaseLabel: "On the pad", mission: 2.6 };
+    return { phase: "assembly", phaseLabel: "On the pad", mission: assemblyMission(version) };
   }
   if (compareVersions(version, "0.9.0") < 0) {
     return { phase: "liftoff", phaseLabel: "Liftoff", mission: 3.25 };

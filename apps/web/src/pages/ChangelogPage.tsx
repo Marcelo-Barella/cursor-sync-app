@@ -7,6 +7,7 @@ import { SiteFooter } from "../components/SiteFooter";
 import type { RocketFlight, RocketLaunchScene } from "../scenes/rocketLaunchScene";
 import { useLazyScene, type SceneLoader } from "../scenes/useLazyScene";
 import { rocketPositionForVersion } from "../lib/changelogReleases";
+import { formatLaunchNote, type LaunchNoteNode } from "../lib/formatLaunchNote";
 import { useExtensionChangelog } from "../lib/useExtensionChangelog";
 import "./ChangelogPage.css";
 
@@ -19,6 +20,22 @@ const FARTHEST_ROW_ID = "launch-farthest";
 type LaunchReadout = { version: string; phaseLabel: string };
 
 const GROUND_READOUT: LaunchReadout = { version: "0.0.0", phaseLabel: "Empty pad" };
+
+function LaunchNoteText({ note }: { note: string }) {
+  return formatLaunchNote(note).map((node, nodeIndex) => <LaunchNoteSpan key={nodeIndex} node={node} />);
+}
+
+function LaunchNoteSpan({ node }: { node: LaunchNoteNode }) {
+  if (node.kind === "text") return node.text;
+  if (node.kind === "code") return <code className="launch-note-code">{node.text}</code>;
+  return (
+    <strong>
+      {node.children.map((child, childIndex) => (
+        <LaunchNoteSpan key={childIndex} node={child} />
+      ))}
+    </strong>
+  );
+}
 
 function launchFocusRatio(): number {
   return window.matchMedia("(max-width: 900px)").matches ? 0.72 : 0.5;
@@ -186,7 +203,9 @@ export function ChangelogPage() {
                         <h2 className="launch-notes-heading mono">{section.heading}</h2>
                         <ul className="launch-notes-items">
                           {section.items.map((item, itemIndex) => (
-                            <li key={itemIndex}>{item}</li>
+                            <li key={itemIndex}>
+                              <LaunchNoteText note={item} />
+                            </li>
                           ))}
                         </ul>
                       </section>

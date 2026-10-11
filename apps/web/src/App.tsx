@@ -13,13 +13,13 @@ export function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<LandingPage />} />
+        <Route path="/changelog" element={<ChangelogPage />} />
         <Route path="/sign-in" element={<SignInPage />} />
         <Route path="/sign-up" element={<SignUpPage />} />
         <Route path="/auth/continue" element={<AuthContinuePage />} />
         <Route path="/auth/callback" element={<AuthCallbackPage />} />
         <Route path="/auth/verify" element={<AuthVerifyPage />} />
         <Route path="/developer" element={<DeveloperPage />} />
-        <Route path="/changelog" element={<ChangelogPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
