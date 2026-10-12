@@ -1,5 +1,10 @@
 const HMAC_HEX_KEY = /^[0-9a-f]{64}$/;
 
+/** Object keys for CSE1 ciphertext blobs in R2 (content-addressed). */
+export function isCse1ObjectStorageKey(key: string): boolean {
+  return HMAC_HEX_KEY.test(key);
+}
+
 export function isRelativePlaintextObjectKey(key: string): boolean {
   if (!key || key.length > 512) {
     return false;
@@ -7,7 +12,7 @@ export function isRelativePlaintextObjectKey(key: string): boolean {
   if (key.startsWith("/") || key.includes("..") || key.includes("\\")) {
     return false;
   }
-  if (HMAC_HEX_KEY.test(key)) {
+  if (isCse1ObjectStorageKey(key)) {
     return false;
   }
   return /^[\w./-]+$/.test(key);

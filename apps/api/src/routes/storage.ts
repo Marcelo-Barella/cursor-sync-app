@@ -1,7 +1,13 @@
 import { Hono } from "hono";
 import { z } from "zod";
+import { plaintextDeleteHttpStatus } from "../lib/plaintext-object-delete-response.js";
 import { filterPlaintextObjectKeys } from "../lib/plaintext-object-keys.js";
-import { deleteUserObjects, getR2Config, mintTempCredentials } from "../lib/r2.js";
+import {
+  deleteUserObjectsDetailed,
+  getR2Config,
+  listPlaintextUserObjects,
+  mintTempCredentials,
+} from "../lib/r2.js";
 import { requireAuth, type AuthVariables } from "../middleware/auth.js";
 import { requireEmailVerified } from "../middleware/require-email-verified.js";
 
@@ -16,6 +22,26 @@ const deletePlaintextBodySchema = z.object({
 });
 
 export const storageRoutes = new Hono<{ Variables: AuthVariables }>();
+
+storageRoutes.get(
+  "/plaintext-objects",
+  requireAuth,
+  requireEmailVerified,
+  async (c) => {
+    const config = getR2Config();
+    if (!config) {
+      return c.json({ error: "Storage credentials unavailable" }, 503);
+    }
+
+    const userId = c.get("userId");
+    try {
+      const keys = await listPlaintextUserObjects(config, userId);
+      return c.json({ keys });
+    } catch {
+      return c.json({ error: "Failed to list objects" }, 502);
+    }
+  }
+);
 
 storageRoutes.post(
   "/plaintext-objects/delete",
@@ -41,8 +67,8 @@ storageRoutes.post(
     const userId = c.get("userId");
 
     try {
-      await deleteUserObjects(config, userId, keys);
-      return c.json({ deleted: keys });
+      const results = await deleteUserObjectsDetailed(config, userId, keys);
+      return c.json({ results }, plaintextDeleteHttpStatus(results));
     } catch {
       return c.json({ error: "Failed to delete objects" }, 502);
     }

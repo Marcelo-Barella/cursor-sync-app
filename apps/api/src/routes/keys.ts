@@ -13,6 +13,7 @@ import {
   rowToKeyResponse,
   setupBodySchema,
 } from "../lib/key-material.js";
+import { auditLogKeyMaterialMutation } from "../lib/keys-audit.js";
 import {
   KEY_FETCH_STATUS,
   auditLogKeyFetch,
@@ -93,9 +94,11 @@ keysRoutes.get("/", async (c) => {
 
 keysRoutes.put("/", async (c) => {
   const userId = c.get("userId");
+  const ip = requestClientIp(c);
   const body = await c.req.json().catch(() => null);
   const parsed = setupBodySchema.safeParse(body);
   if (!parsed.success) {
+    auditLogKeyMaterialMutation("keys_put", userId, ip, 400);
     return c.json({ error: "INVALID_PAYLOAD" }, 400);
   }
 
@@ -104,6 +107,7 @@ keysRoutes.put("/", async (c) => {
     material = parseSetupBody(parsed.data);
   } catch (err) {
     if (err instanceof KeyMaterialValidationError) {
+      auditLogKeyMaterialMutation("keys_put", userId, ip, 400);
       return c.json({ error: "INVALID_PAYLOAD", message: err.message }, 400);
     }
     throw err;
@@ -132,9 +136,11 @@ keysRoutes.put("/", async (c) => {
   );
 
   if (inserted.rows.length === 0) {
+    auditLogKeyMaterialMutation("keys_put", userId, ip, 409);
     return c.json({ error: "KEYS_ALREADY_SET" }, 409);
   }
 
+  auditLogKeyMaterialMutation("keys_put", userId, ip, 201);
   return c.json(rowToKeyResponse({
     key_version: material.keyVersion,
     kdf: material.kdf,
@@ -149,9 +155,11 @@ keysRoutes.put("/", async (c) => {
 
 keysRoutes.post("/rewrap", async (c) => {
   const userId = c.get("userId");
+  const ip = requestClientIp(c);
   const body = await c.req.json().catch(() => null);
   const parsed = rewrapBodySchema.safeParse(body);
   if (!parsed.success) {
+    auditLogKeyMaterialMutation("keys_rewrap", userId, ip, 400);
     return c.json({ error: "INVALID_PAYLOAD" }, 400);
   }
 
@@ -160,6 +168,7 @@ keysRoutes.post("/rewrap", async (c) => {
     material = parseRewrapBody(parsed.data);
   } catch (err) {
     if (err instanceof KeyMaterialValidationError) {
+      auditLogKeyMaterialMutation("keys_rewrap", userId, ip, 400);
       return c.json({ error: "INVALID_PAYLOAD", message: err.message }, 400);
     }
     throw err;
@@ -193,17 +202,21 @@ keysRoutes.post("/rewrap", async (c) => {
       material.dekVerifier
     );
     const err = keyMaterialJsonError(reason);
+    auditLogKeyMaterialMutation("keys_rewrap", userId, ip, err.status);
     return c.json(err.body, err.status);
   }
 
+  auditLogKeyMaterialMutation("keys_rewrap", userId, ip, 200);
   return c.json(rowToKeyResponse(updated.rows[0]!));
 });
 
 keysRoutes.post("/recovery", async (c) => {
   const userId = c.get("userId");
+  const ip = requestClientIp(c);
   const body = await c.req.json().catch(() => null);
   const parsed = recoveryBodySchema.safeParse(body);
   if (!parsed.success) {
+    auditLogKeyMaterialMutation("keys_recovery", userId, ip, 400);
     return c.json({ error: "INVALID_PAYLOAD" }, 400);
   }
 
@@ -212,6 +225,7 @@ keysRoutes.post("/recovery", async (c) => {
     material = parseRecoveryBody(parsed.data);
   } catch (err) {
     if (err instanceof KeyMaterialValidationError) {
+      auditLogKeyMaterialMutation("keys_recovery", userId, ip, 400);
       return c.json({ error: "INVALID_PAYLOAD", message: err.message }, 400);
     }
     throw err;
@@ -242,8 +256,10 @@ keysRoutes.post("/recovery", async (c) => {
       material.dekVerifier
     );
     const err = keyMaterialJsonError(reason);
+    auditLogKeyMaterialMutation("keys_recovery", userId, ip, err.status);
     return c.json(err.body, err.status);
   }
 
+  auditLogKeyMaterialMutation("keys_recovery", userId, ip, 200);
   return c.json(rowToKeyResponse(updated.rows[0]!));
 });

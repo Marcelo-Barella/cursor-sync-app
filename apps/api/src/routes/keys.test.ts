@@ -344,6 +344,32 @@ describe("v1 keys API", { skip: !databaseUrl }, () => {
     await pool.query(`DELETE FROM users WHERE id = $1`, [userId]);
   });
 
+  it("audit logs key mutations without key bytes", async () => {
+    const info = mock.method(console, "info", () => {});
+    await app.request("/v1/keys/rewrap", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${verifiedToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        keyVersion: 99,
+        dekVerifier: "c".repeat(DEK_VERIFIER_HEX_LENGTH),
+        kdfParams: { m: 64 * 1024 * 1024, t: 3, p: 1 },
+        salt: b64(MIN_SALT_BYTES),
+        passWrap: { nonce: b64(NONCE_BYTES), ct: b64(WRAPPED_DEK_BYTES) },
+      }),
+    });
+
+    const mutationLine = info.mock.calls
+      .map((call) => String(call.arguments[0]))
+      .find((line) => line.includes("key_material_mutation"));
+    assert.ok(mutationLine);
+    assert.ok(mutationLine!.includes('"operation":"keys_rewrap"'));
+    assert.ok(!mutationLine!.includes("passWrap"));
+    info.mock.restore();
+  });
+
   it("audit logs fetches without key bytes", async () => {
     const info = mock.method(console, "info", () => {});
     await app.request("/v1/keys", {

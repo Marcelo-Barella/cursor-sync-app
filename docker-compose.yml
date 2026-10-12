@@ -18,6 +18,9 @@ services:
     build:
       context: .
       dockerfile: apps/api/Dockerfile
+      args:
+        GIT_SHA: ${GIT_SHA:-unknown}
+        APP_VERSION: ${APP_VERSION:-0.1.0}
     ports:
       - "8100:8100"
     environment:
