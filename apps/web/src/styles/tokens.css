@@ -1,13 +1,25 @@
 :root {
-  --color-ground: #11110b;
-  --color-surface: #1a1913;
-  --color-ink: #f7f7f4;
-  --color-muted: #9a9a93;
-  --color-line: #2a2922;
+  --color-void: #07080a;
+  --color-ground: #0e0e10;
+  --color-surface: #131315;
+  --color-panel: #1c1b1e;
+  --color-raised: #2a2a2c;
+  --color-ink: #e5e1e4;
+  --color-bright: #ffffff;
+  --color-muted: #c5c6c9;
+  --color-faint: #8f9194;
+  --color-line: #2c2d30;
+  --color-line-strong: #44474a;
   --color-bergamota: #e87a2e;
+  --color-bergamota-light: #ffa366;
+  --color-signal: #c0c1ff;
+  --color-cyan: #38bdf8;
+  --color-flame: #f97316;
+  --color-ok: #10b981;
 
-  --font-display: "Inter Tight", "Inter", system-ui, sans-serif;
-  --font-body: "Inter", system-ui, sans-serif;
+  --font-display: "Geist", "Inter", system-ui, sans-serif;
+  --font-body: "Geist", "Inter", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
 
   --space-1: 8px;
   --space-2: 16px;
@@ -17,9 +29,11 @@
   --space-6: 48px;
   --space-8: 64px;
 
-  --radius-control: 8px;
-  --radius-card: 12px;
+  --radius-control: 4px;
+  --radius-card: 8px;
+  --radius-pill: 12px;
 
+  --max-wide: 1200px;
   --max-content: 960px;
   --max-narrow: 400px;
 }
@@ -41,9 +55,31 @@ body {
   background: var(--color-ground);
   color: var(--color-ink);
   font-family: var(--font-body);
-  font-size: 16px;
-  line-height: 1.5;
+  font-size: 14px;
+  line-height: 1.45;
+  letter-spacing: -0.01em;
   -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+::selection {
+  background: var(--color-raised);
+  color: var(--color-bright);
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+
+.signal-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-signal);
+  box-shadow: 0 0 8px var(--color-signal);
 }
 
 a {

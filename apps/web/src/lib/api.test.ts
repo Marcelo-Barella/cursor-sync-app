@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { getMe, signIn, signUp, verifyEmail } from "./api";
+import { getExtensionChangelog, getMe, signIn, signUp, verifyEmail } from "./api";
 import { AuthApiError } from "./authErrors";
 import { getApiBaseUrlForAuth, isAuthApiBaseMissing } from "./apiBase";
 
@@ -152,5 +152,30 @@ describe("api auth", () => {
       expect.objectContaining({ category: "empty_api_base" })
     );
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("getExtensionChangelog reads GET /changelog from the resolved API base", async () => {
+    const changelog = { fetchedAt: "2026-10-07T16:00:00.000Z", latest: "0.8.4", releases: [] };
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => changelog });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(getExtensionChangelog()).resolves.toEqual(changelog);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.example.com/changelog",
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
+    );
+  });
+
+  it("getExtensionChangelog rejects when the API has no changelog", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 503,
+        json: async () => ({ error: "changelog_unavailable" }),
+      })
+    );
+
+    await expect(getExtensionChangelog()).rejects.toThrow("changelog_unavailable");
   });
 });

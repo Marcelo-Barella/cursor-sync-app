@@ -4,6 +4,7 @@ import { pingDatabase } from "./db/pool.js";
 import { getBuildInfo } from "./lib/build-info.js";
 import { resolveCorsOrigin } from "./lib/cors.js";
 import { authRoutes } from "./routes/auth.js";
+import { changelogRoutes } from "./routes/changelog.js";
 import { configsRoutes } from "./routes/configs.js";
 import { keysRoutes } from "./routes/keys.js";
 import { loginRoutes } from "./routes/login.js";
@@ -32,6 +33,7 @@ export function createApp() {
   });
 
   app.route("/auth", authRoutes);
+  app.route("/changelog", changelogRoutes);
   app.route("/configs", configsRoutes);
   app.route("/v1/keys", keysRoutes);
   app.route("/v1/storage", storageRoutes);

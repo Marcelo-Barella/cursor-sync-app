@@ -15,8 +15,10 @@ import {
   messageForAuthErrorCategory,
   type AuthErrorCategory,
 } from "./authErrors";
+import type { ExtensionChangelog } from "./changelogReleases";
 
 const AUTH_FETCH_TIMEOUT_MS = 30_000;
+const CHANGELOG_FETCH_TIMEOUT_MS = 10_000;
 
 function requireApiBaseUrl(): string {
   if (isAuthApiBaseMissing()) {
@@ -264,4 +266,12 @@ export async function issueLoginCode(
     body: JSON.stringify(body),
   });
   return parseJson<LoginCodeResponse>(response);
+}
+
+export async function getExtensionChangelog(): Promise<ExtensionChangelog> {
+  const base = requireApiBaseUrl();
+  const response = await fetch(`${base}/changelog`, {
+    signal: AbortSignal.timeout(CHANGELOG_FETCH_TIMEOUT_MS),
+  });
+  return parseJson<ExtensionChangelog>(response);
 }

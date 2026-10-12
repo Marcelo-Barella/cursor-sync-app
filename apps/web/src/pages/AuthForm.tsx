@@ -18,6 +18,7 @@ import {
   saveOAuthParams,
   saveToken,
 } from "../lib/auth";
+import { EXTENSION_LISTING_URL } from "../lib/defaults";
 import { AuthLayout } from "../components/AuthLayout";
 import { Button } from "../components/Button";
 import { Input } from "../components/Input";
@@ -25,6 +26,8 @@ import { Input } from "../components/Input";
 type AuthFormProps = {
   mode: "sign-in" | "sign-up";
 };
+
+type AuthFormView = "form" | "connected";
 
 function emptyApiBaseFormError(): MappedAuthFormError {
   return mapAuthApiError(
@@ -46,6 +49,7 @@ export function AuthForm({ mode }: AuthFormProps) {
   );
   const [loading, setLoading] = useState(false);
   const [oauthError, setOauthError] = useState<string | null>(null);
+  const [view, setView] = useState<AuthFormView>("form");
 
   const rawRedirectQuery =
     searchParams.get("redirect_uri") ??
@@ -92,6 +96,10 @@ export function AuthForm({ mode }: AuthFormProps) {
     window.location.href = redirectUri ?? EXTENSION_AUTH_URI;
   }
 
+  function continueInCursor() {
+    navigate(continuePath, { replace: true });
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setFormError(null);
@@ -132,7 +140,7 @@ export function AuthForm({ mode }: AuthFormProps) {
       if (redirectUri) {
         saveOAuthParams(redirectUri, oauthState);
       }
-      navigate(continuePath, { replace: true });
+      setView("connected");
     } catch (caught) {
       setFormError(mapAuthApiError(caught));
     } finally {
@@ -156,18 +164,39 @@ export function AuthForm({ mode }: AuthFormProps) {
       ? isSignUp
         ? "Creating account…"
         : "Signing in…"
-      : primaryAction === "try_again"
-        ? "Try again"
-        : "Continue in Cursor";
+        : primaryAction === "try_again"
+          ? "Try again"
+          : isSignUp
+            ? "Create account."
+            : "Sign in.";
+
+  const connectedPanel =
+    view === "connected" ? (
+      <>
+        <div className="auth-card-header">
+          <h2 className="auth-card-title">You're connected.</h2>
+          <p className="auth-card-sub">
+            Your recovery key appears once, in the Cursor Sync extension, right after you continue.
+          </p>
+        </div>
+        <p className="auth-connected-warning">
+          Save it somewhere safe, like a password manager. This is the only time it is shown. If you lose it,
+          you'll need to restart syncing, and some files may be missing afterwards.
+        </p>
+        <Button type="button" variant="primary" fullWidth autoFocus onClick={continueInCursor}>
+          Continue in Cursor
+        </Button>
+      </>
+    ) : undefined;
 
   return (
-    <AuthLayout page={page}>
+    <AuthLayout page={page} connectedPanel={connectedPanel}>
       <div className="auth-card-header">
-        <h1 className="auth-card-title">{isSignUp ? "Create an account" : "Sign in"}</h1>
+        <h1 className="auth-card-title">{isSignUp ? "Create an account." : "Sign in."}</h1>
         <p className="auth-card-sub">
           {isSignUp
-            ? "Opened from the Cursor Sync extension. We will email you a verification link after signup."
-            : "Opened from the Cursor Sync extension."}
+            ? "Link your machines to one account. We will email you a verification link after signup."
+            : "Link this machine to your account. Your sealed files stay sealed."}
         </p>
       </div>
 
@@ -177,7 +206,7 @@ export function AuthForm({ mode }: AuthFormProps) {
           type="email"
           name="email"
           autoComplete="email"
-          placeholder="you@example.com"
+          placeholder="dev@company.com"
           value={email}
           onChange={(event) => setEmail(event.target.value)}
           error={formError?.field === "email" ? fieldMessage : undefined}
@@ -196,6 +225,7 @@ export function AuthForm({ mode }: AuthFormProps) {
           minLength={8}
           required
         />
+        <p className="auth-form-hint">Your sync passphrase stays in the extension. The website never sees it.</p>
         {isSignUp ? (
           <Input
             label="Confirm password"
@@ -231,7 +261,15 @@ export function AuthForm({ mode }: AuthFormProps) {
             {submitLabel}
           </Button>
         )}
+        <a className="auth-form-install" href={EXTENSION_LISTING_URL} target="_blank" rel="noreferrer">
+          Install the extension.
+        </a>
       </form>
+
+      <p className="auth-zero-knowledge mono">
+        <i aria-hidden="true" />
+        Zero knowledge. Sealed files live in Cloudflare R2.
+      </p>
 
       <p className="auth-form-footer">
         {isSignUp ? (

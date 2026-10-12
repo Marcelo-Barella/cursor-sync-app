@@ -1,4 +1,5 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { ChangelogPage } from "./pages/ChangelogPage";
 import { LandingPage } from "./pages/LandingPage";
 import { SignInPage } from "./pages/SignInPage";
 import { SignUpPage } from "./pages/SignUpPage";
@@ -12,6 +13,7 @@ export function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<LandingPage />} />
+        <Route path="/changelog" element={<ChangelogPage />} />
         <Route path="/sign-in" element={<SignInPage />} />
         <Route path="/sign-up" element={<SignUpPage />} />
         <Route path="/auth/continue" element={<AuthContinuePage />} />
