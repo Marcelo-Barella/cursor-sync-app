@@ -6,6 +6,8 @@ export const CURSOR_SYNC_STAGING_API_BASE_URL =
 export const DEFAULT_LOCAL_API_BASE_URL = "http://localhost:8100";
 export const DEFAULT_PUBLIC_SITE_HOST = "sync.bergamota.dev";
 export const CURSOR_SYNC_STAGING_SITE_HOST = "staging.cursor-sync.com";
+export const EXTENSION_LISTING_URL =
+  "https://open-vsx.org/extension/MarceloBarella/cursor-sync";
 
 export function isCursorSyncStagingHost(hostname: string): boolean {
   return hostname === CURSOR_SYNC_STAGING_SITE_HOST;
