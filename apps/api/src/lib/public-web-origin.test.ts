@@ -20,6 +20,13 @@ describe("public web origin", () => {
     assert.equal(getPublicWebOrigin(), "https://web.example.com");
   });
 
+  it("returns null when PUBLIC_WEB_ORIGIN and WEB_ORIGIN are unset", () => {
+    delete process.env.PUBLIC_WEB_ORIGIN;
+    delete process.env.WEB_ORIGIN;
+    assert.equal(getPublicWebOrigin(), null);
+    assert.equal(buildEmailVerificationLink("raw-token-abc"), null);
+  });
+
   it("builds verify links under /auth/verify", () => {
     process.env.PUBLIC_WEB_ORIGIN = "https://staging.sync.example";
     const link = buildEmailVerificationLink("raw-token-abc");

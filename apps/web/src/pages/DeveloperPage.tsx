@@ -5,10 +5,11 @@ import { Input } from "../components/Input";
 import { Mark } from "../components/Mark";
 import { SiteFooter } from "../components/SiteFooter";
 import {
-  DEFAULT_API_BASE_URL,
   LOCAL_API_PRESET,
   getStoredApiOverride,
+  isBuildTimeApiBaseConfigured,
   normalizeApiBaseUrl,
+  readBuildTimeApiUrl,
   resolveApiBaseUrl,
   setStoredApiOverride,
 } from "../lib/apiBase";
@@ -43,6 +44,8 @@ export function DeveloperPage() {
       removeItem: () => undefined,
     },
   });
+  const buildTimeApiUrl = readBuildTimeApiUrl();
+  const buildTimeConfigured = isBuildTimeApiBaseConfigured();
 
   return (
     <div className="developer-page" data-page="developer">
@@ -73,8 +76,10 @@ export function DeveloperPage() {
               <dd className="developer-mono">{effectiveWithoutOverride}</dd>
             </div>
             <div className="developer-meta-row">
-              <dt>Production default</dt>
-              <dd className="developer-mono">{DEFAULT_API_BASE_URL}</dd>
+              <dt>Build-time API URL (VITE_API_URL)</dt>
+              <dd className="developer-mono">
+                {buildTimeConfigured ? buildTimeApiUrl : "(not set — auth disabled)"}
+              </dd>
             </div>
           </dl>
 
