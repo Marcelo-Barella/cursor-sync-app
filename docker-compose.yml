@@ -1,6 +1,7 @@
 services:
   postgres:
     image: postgres:16
+    restart: unless-stopped
     environment:
       POSTGRES_USER: cursor_sync
       POSTGRES_PASSWORD: cursor_sync
@@ -21,8 +22,9 @@ services:
       args:
         GIT_SHA: ${GIT_SHA:-unknown}
         APP_VERSION: ${APP_VERSION:-0.1.0}
+    restart: unless-stopped
     ports:
-      - "8100:8100"
+      - "${API_BIND:-0.0.0.0}:8100:8100"
     environment:
       DATABASE_URL: postgres://cursor_sync:cursor_sync@postgres:5432/cursor_sync
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
