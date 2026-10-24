@@ -1,0 +1,41 @@
+.mark {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.mark-image {
+  width: auto;
+  height: 100%;
+  object-fit: contain;
+}
+
+.mark--sm {
+  height: 40px;
+}
+
+.mark--md {
+  height: 64px;
+}
+
+.mark--lg {
+  height: 94px;
+}
+
+.mark-wordmark {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mark-name {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--color-ink);
+}
+
+.mark-tagline {
+  font-size: 0.75rem;
+  color: var(--color-muted);
+}

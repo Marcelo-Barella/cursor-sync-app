@@ -1,0 +1,120 @@
+.developer-page {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-ground);
+}
+
+.developer-header {
+  border-bottom: 1px solid var(--color-line);
+  background: var(--color-surface);
+}
+
+.developer-header-inner {
+  max-width: var(--max-content);
+  margin: 0 auto;
+  padding: var(--space-3);
+}
+
+.developer-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.developer-brand-name {
+  font-family: var(--font-display);
+  font-size: 0.9375rem;
+  font-weight: 500;
+}
+
+.developer-main {
+  flex: 1;
+  padding: var(--space-6) var(--space-3);
+}
+
+.developer-panel {
+  max-width: var(--max-narrow);
+  margin: 0 auto;
+  padding: var(--space-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+}
+
+.developer-title {
+  margin: 0 0 var(--space-2);
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 500;
+  line-height: 1.3;
+}
+
+.developer-lead {
+  margin: 0 0 var(--space-4);
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--color-muted);
+}
+
+.developer-meta {
+  margin: 0 0 var(--space-4);
+  padding: 0;
+}
+
+.developer-meta-row {
+  display: grid;
+  gap: 4px;
+  margin-bottom: var(--space-2);
+}
+
+.developer-meta-row dt {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-muted);
+}
+
+.developer-meta-row dd {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  word-break: break-all;
+}
+
+.developer-mono {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+.developer-form {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.developer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.developer-message {
+  margin: var(--space-3) 0 0;
+  font-size: 0.875rem;
+  color: var(--color-muted);
+}
+
+.developer-hint {
+  margin: var(--space-4) 0 0;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--color-muted);
+}
+
+.developer-inline-code {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.75rem;
+  padding: 1px 4px;
+  border-radius: 4px;
+  border: 1px solid var(--color-line);
+  background: var(--color-ground);
+}

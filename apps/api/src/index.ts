@@ -1,7 +1,5 @@
 import { serve } from "@hono/node-server";
-import { Hono } from "hono";
-import { pingDatabase } from "./db/pool.js";
-import { authRoutes } from "./routes/auth.js";
+import { createApp } from "./create-app.js";
 import { assertJwtSecretConfigured, sessionExpiry } from "./lib/session.js";
 
 try {
@@ -11,18 +9,7 @@ try {
   process.exit(1);
 }
 
-const app = new Hono();
-
-app.get("/health", async (c) => {
-  try {
-    await pingDatabase();
-    return c.json({ status: "ok" });
-  } catch {
-    return c.json({ status: "error" }, 503);
-  }
-});
-
-app.route("/auth", authRoutes);
+const app = createApp();
 
 const port = Number(process.env.PORT ?? 8100);
 
