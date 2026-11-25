@@ -25,6 +25,17 @@ export const AUTH_SESSION_STORAGE_KEYS = [
 
 export const AUTH_COOKIE_NAMES: string[] = [];
 
+export const AUTH_LOGOUT_BROADCAST_KEY = "cursor-sync-auth-logout-broadcast";
+
+export function broadcastAuthLogout(storage?: Storage): void {
+  const target =
+    storage ?? (typeof localStorage !== "undefined" ? localStorage : undefined);
+  if (!target) {
+    return;
+  }
+  target.setItem(AUTH_LOGOUT_BROADCAST_KEY, String(Date.now()));
+}
+
 export type LogoutNavigate = (path: string, options?: { replace?: boolean }) => void;
 
 export type LogoutOptions = {
@@ -60,6 +71,7 @@ export function clearClientAuthState(storage?: {
   clearToken();
   setStoredApiOverride(null, local);
   clearMemorySession();
+  broadcastAuthLogout(local);
   clearAuthCookies();
   void clearE2eKeyCache();
 }

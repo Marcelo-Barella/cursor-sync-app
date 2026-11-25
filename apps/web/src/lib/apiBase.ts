@@ -211,6 +211,21 @@ export function getApiBaseUrlForAuth(): string | null {
   return null;
 }
 
+export function resolveBuildTimeOnlyApiBaseUrl(
+  options: { buildTimeUrl?: string; mode?: string } = {}
+): string | null {
+  const mode = options.mode ?? import.meta.env.MODE;
+  const buildTimeRaw = readBuildTimeApiUrl(options.buildTimeUrl);
+  if (buildTimeRaw) {
+    const normalized = normalizeApiBaseUrl(buildTimeRaw);
+    if (normalized) {
+      return normalized;
+    }
+  }
+  const fallback = defaultApiBaseForMode(mode);
+  return normalizeApiBaseUrl(fallback);
+}
+
 export function isAuthApiBaseMissing(): boolean {
   return getApiBaseUrlForAuth() === null;
 }

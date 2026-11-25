@@ -9,7 +9,11 @@ export type AuthError = {
   error: string;
 };
 
-import { getApiBaseUrlForAuth, isAuthApiBaseMissing } from "./apiBase";
+import {
+  getApiBaseUrlForAuth,
+  getBuildTimeOnlyApiBaseUrlForAuth,
+  isAuthApiBaseMissing,
+} from "./apiBase";
 import {
   AuthApiError,
   messageForAuthErrorCategory,
@@ -28,6 +32,17 @@ function requireApiBaseUrl(): string {
     );
   }
   const base = getApiBaseUrlForAuth();
+  if (!base) {
+    throw new AuthApiError(
+      "empty_api_base",
+      messageForAuthErrorCategory("empty_api_base")
+    );
+  }
+  return base;
+}
+
+function requireBuildTimeOnlyApiBaseUrl(): string {
+  const base = getBuildTimeOnlyApiBaseUrlForAuth();
   if (!base) {
     throw new AuthApiError(
       "empty_api_base",
@@ -231,7 +246,7 @@ export async function resendVerificationEmail(
 }
 
 export async function getMe(token: string): Promise<MeResponse> {
-  const base = requireApiBaseUrl();
+  const base = requireBuildTimeOnlyApiBaseUrl();
   const response = await fetch(`${base}/auth/me`, {
     headers: { Authorization: `Bearer ${token}` },
   });
