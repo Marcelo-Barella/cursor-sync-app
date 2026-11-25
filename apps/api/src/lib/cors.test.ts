@@ -1,11 +1,18 @@
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
-import { originMatchesAllowedPattern, resolveCorsOrigin } from "./cors.js";
+import {
+  isCorsAllowlistConfigured,
+  logCorsStartup,
+  originMatchesAllowedPattern,
+  resetCorsRejectWarnForTests,
+  resolveCorsOrigin,
+} from "./cors.js";
 
 const originalOrigins = process.env.CORS_ALLOWED_ORIGINS;
 const originalPatterns = process.env.CORS_ALLOWED_ORIGIN_PATTERNS;
 
 afterEach(() => {
+  resetCorsRejectWarnForTests();
   if (originalOrigins === undefined) {
     delete process.env.CORS_ALLOWED_ORIGINS;
   } else {
@@ -18,14 +25,37 @@ afterEach(() => {
   }
 });
 
-test("reflects request origin when allowlist env is unset", () => {
+test("denies cross-origin when allowlist env is unset", () => {
   delete process.env.CORS_ALLOWED_ORIGINS;
   delete process.env.CORS_ALLOWED_ORIGIN_PATTERNS;
   assert.equal(
     resolveCorsOrigin("https://staging.cursor-sync.com"),
-    "https://staging.cursor-sync.com"
+    null
   );
-  assert.equal(resolveCorsOrigin(undefined), "*");
+  assert.equal(resolveCorsOrigin(undefined), null);
+  assert.equal(isCorsAllowlistConfigured(), false);
+});
+
+test("treats empty allowlist env as unset", () => {
+  process.env.CORS_ALLOWED_ORIGINS = "   ";
+  assert.equal(resolveCorsOrigin("https://staging.cursor-sync.com"), null);
+  assert.equal(isCorsAllowlistConfigured(), false);
+});
+
+test("logCorsStartup errors once when allowlist unset", () => {
+  const errors: string[] = [];
+  const originalError = console.error;
+  console.error = (message?: unknown) => {
+    errors.push(String(message));
+  };
+  try {
+    delete process.env.CORS_ALLOWED_ORIGINS;
+    logCorsStartup();
+    assert.equal(errors.length, 1);
+    assert.match(errors[0]!, /fail closed/i);
+  } finally {
+    console.error = originalError;
+  }
 });
 
 test("allows only configured origins when allowlist env is set", () => {
@@ -83,9 +113,21 @@ test("denies lookalike and non-https origins for patterns", () => {
   );
 });
 
-test("ignores origin patterns when env is unset", () => {
+test("ignores origin patterns when pattern env is unset", () => {
   process.env.CORS_ALLOWED_ORIGINS = "https://staging.cursor-sync.com";
   delete process.env.CORS_ALLOWED_ORIGIN_PATTERNS;
+  assert.equal(
+    resolveCorsOrigin(
+      "https://cursor-sync-abc123-marcelo-barellas-projects.vercel.app"
+    ),
+    null
+  );
+});
+
+test("ignores origin patterns when allowlist env is unset", () => {
+  delete process.env.CORS_ALLOWED_ORIGINS;
+  process.env.CORS_ALLOWED_ORIGIN_PATTERNS =
+    "*-marcelo-barellas-projects.vercel.app";
   assert.equal(
     resolveCorsOrigin(
       "https://cursor-sync-abc123-marcelo-barellas-projects.vercel.app"

@@ -1,5 +1,6 @@
 import { serve } from "@hono/node-server";
 import { createApp } from "./create-app.js";
+import { logCorsStartup } from "./lib/cors.js";
 import { assertJwtSecretConfigured, sessionExpiry } from "./lib/session.js";
 
 try {
@@ -8,6 +9,8 @@ try {
   console.error(err instanceof Error ? err.message : err);
   process.exit(1);
 }
+
+logCorsStartup();
 
 const app = createApp();
 

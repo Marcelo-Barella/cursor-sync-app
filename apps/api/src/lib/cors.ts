@@ -51,12 +51,45 @@ function matchesAnyOriginPattern(origin: string, patternsRaw: string): boolean {
   return patterns.some((pattern) => originMatchesAllowedPattern(origin, pattern));
 }
 
+const CORS_REJECT_WARN_INTERVAL_MS = 60_000;
+let lastCorsRejectWarnAt = 0;
+
+export function isCorsAllowlistConfigured(): boolean {
+  return Boolean(process.env.CORS_ALLOWED_ORIGINS?.trim());
+}
+
+export function logCorsStartup(): void {
+  if (!isCorsAllowlistConfigured()) {
+    console.error(
+      "CORS_ALLOWED_ORIGINS is unset or empty: cross-origin browser access is denied (fail closed)"
+    );
+  }
+}
+
+function warnCorsOriginRejectedUnsetAllowlist(origin: string): void {
+  const now = Date.now();
+  if (now - lastCorsRejectWarnAt < CORS_REJECT_WARN_INTERVAL_MS) {
+    return;
+  }
+  lastCorsRejectWarnAt = now;
+  console.warn(
+    `CORS rejected Origin ${origin} because CORS_ALLOWED_ORIGINS is unset or empty`
+  );
+}
+
+export function resetCorsRejectWarnForTests(): void {
+  lastCorsRejectWarnAt = 0;
+}
+
 export function resolveCorsOrigin(requestOrigin: string | undefined): string | null {
   const raw = process.env.CORS_ALLOWED_ORIGINS?.trim();
   const patternsRaw = process.env.CORS_ALLOWED_ORIGIN_PATTERNS?.trim();
 
   if (!raw) {
-    return requestOrigin ?? "*";
+    if (requestOrigin) {
+      warnCorsOriginRejectedUnsetAllowlist(requestOrigin);
+    }
+    return null;
   }
 
   const allowed = raw
