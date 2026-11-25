@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
-    "build:staging": "tsc -b && vite build --mode staging",
+    "build": "node scripts/generate-security-headers.mjs && tsc -b && vite build",
+    "build:staging": "node scripts/generate-security-headers.mjs && tsc -b && vite build --mode staging",
     "preview": "vite preview",
     "test": "vitest run"
   },

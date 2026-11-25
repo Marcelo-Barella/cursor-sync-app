@@ -83,44 +83,58 @@ export function DeveloperPage() {
             </div>
           </dl>
 
-          <form className="developer-form" onSubmit={onSubmit}>
-            <Input
-              label="API base URL override"
-              name="apiBase"
-              type="url"
-              inputMode="url"
-              autoComplete="off"
-              spellCheck={false}
-              placeholder="https://api.example.com"
-              value={draft}
-              onChange={(event) => setDraft(event.target.value)}
-            />
-            <div className="developer-actions">
-              <Button type="submit" variant="secondary">
-                Save override
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => applyOverride(LOCAL_API_PRESET)}
-              >
-                Local
-              </Button>
-              <Button type="button" variant="ghost" onClick={() => applyOverride(null)}>
-                Clear override
-              </Button>
-            </div>
-          </form>
+          {import.meta.env.DEV ? (
+            <>
+              <form className="developer-form" onSubmit={onSubmit}>
+                <Input
+                  label="API base URL override"
+                  name="apiBase"
+                  type="url"
+                  inputMode="url"
+                  autoComplete="off"
+                  spellCheck={false}
+                  placeholder="http://localhost:8100"
+                  value={draft}
+                  onChange={(event) => setDraft(event.target.value)}
+                />
+                <div className="developer-actions">
+                  <Button type="submit" variant="secondary">
+                    Save override
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => applyOverride(LOCAL_API_PRESET)}
+                  >
+                    Local
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => applyOverride(null)}
+                  >
+                    Clear override
+                  </Button>
+                </div>
+              </form>
 
-          {message ? <p className="developer-message">{message}</p> : null}
+              {message ? <p className="developer-message">{message}</p> : null}
 
-          <p className="developer-hint">
-            You can also set{" "}
-            <code className="developer-inline-code">?api=&lt;url&gt;</code> in the
-            address bar; a valid value is saved here automatically. Use{" "}
-            <code className="developer-inline-code">?api=clear</code> to remove the
-            stored override.
-          </p>
+              <p className="developer-hint">
+                Dev only: set{" "}
+                <code className="developer-inline-code">?api=&lt;url&gt;</code> on
+                localhost or 127.0.0.1, or hosts in{" "}
+                <code className="developer-inline-code">VITE_DEV_API_ALLOWLIST</code>.
+                Use <code className="developer-inline-code">?api=clear</code> to
+                remove the stored override.
+              </p>
+            </>
+          ) : (
+            <p className="developer-hint">
+              API overrides are disabled in this build. The site uses the build-time{" "}
+              <code className="developer-inline-code">VITE_API_URL</code> only.
+            </p>
+          )}
         </div>
       </main>
 

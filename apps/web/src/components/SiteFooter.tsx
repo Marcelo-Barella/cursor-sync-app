@@ -16,7 +16,7 @@ export function SiteFooter() {
         <nav className="site-footer-links" aria-label="Footer">
           <Link to="/changelog">Changelog</Link>
           <Link to="/sign-in">Sign in</Link>
-          <Link to="/developer">Developer</Link>
+          {import.meta.env.DEV ? <Link to="/developer">Developer</Link> : null}
         </nav>
       </div>
     </footer>
