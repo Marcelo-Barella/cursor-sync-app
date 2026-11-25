@@ -1,6 +1,6 @@
 # cursor-sync-app
 
-Cursor Sync website, auth API, and Postgres (sync.bergamota.dev).
+Cursor Sync website, auth API, and Postgres (cursor-sync.com).
 
 Monorepo for the Cursor Sync backend and public website. Email/password auth via a TypeScript API backed by Postgres 16, with a React marketing site and auth UI that hands off to the Cursor extension.
 
@@ -9,7 +9,8 @@ Monorepo for the Cursor Sync backend and public website. Email/password auth via
 | Environment | Postgres | API | Website | Who runs it |
 |-------------|----------|-----|---------|-------------|
 | **Local dev** | Postgres 16 in `docker-compose.yml` (this repo) | `localhost:8100` via compose port map | `localhost:3000` (Vite dev or compose) | You |
-| **Staging** | DevOps / VPS (not compose Postgres) | `https://api-staging-sync.bergamota.dev` | `https://staging.sync.bergamota.dev` | DevOps |
+| **Staging** | DevOps / VPS (not compose Postgres) | `https://api-staging.cursor-sync.com` | `https://staging.cursor-sync.com` | DevOps |
+| **Production** | DevOps | `https://api.cursor-sync.com` | `https://cursor-sync.com` | DevOps |
 | **Lab** | Separate docker-internal Postgres on marcelo-1 | DevOps (Tailscale, e.g. `http://100.78.40.83:8100`) | DevOps | DevOps |
 
 **Local compose is for development only.** The Postgres container in this repo is not the lab or production database.
@@ -54,13 +55,13 @@ npm run dev:web
 
 The website calls the API at `VITE_API_URL` (see `.env.example`). For a one-off override in the browser, open **Developer** in the footer or use `?api=<url>` on any page.
 
-**Staging website build** (API default via env file, production resolver fallback unchanged):
+**Staging website build** (API URL from env file; no hard-coded API host in the bundle):
 
 ```bash
 npm run build:staging -w @cursor-sync/web
 ```
 
-Uses `apps/web/.env.staging` (`VITE_API_URL=https://api-staging-sync.bergamota.dev`). Deploy the `dist/` output to `https://staging.sync.bergamota.dev` with `apps/web/vercel.json` SPA rewrites so `/sign-in`, `/auth/callback`, and `/developer` work on hard refresh.
+Uses `apps/web/.env.staging` (`VITE_API_URL=https://api-staging.cursor-sync.com`). Deploy the `dist/` output to `https://staging.cursor-sync.com` with `apps/web/vercel.json` SPA rewrites so `/sign-in`, `/auth/callback`, and `/developer` work on hard refresh.
 
 ### Endpoints
 
@@ -146,8 +147,11 @@ See `.env.example`:
 | `DATABASE_URL` | Postgres connection string (set automatically in Compose) |
 | `JWT_SECRET` | Required. Secret for signing session JWTs; must not be missing or a known placeholder |
 | `PORT` | API port (default `8100`) |
-| `CORS_ALLOWED_ORIGINS` | Optional comma-separated browser origins (e.g. `https://staging.sync.bergamota.dev`). When unset, the API reflects the request `Origin` header (or `*` when absent). |
-| `VITE_API_URL` | Website: API origin baked into the Vite build (e.g. `http://localhost:8100` locally). When unset at build time, the site defaults to `https://api.sync.bergamota.dev`. Runtime overrides: footer **Developer** panel or `?api=<url>` (stored in `localStorage`). |
+| `PUBLIC_WEB_ORIGIN` / `WEB_ORIGIN` | Public website origin for verification links (required in deployed environments; no trailing slash required) |
+| `CORS_ALLOWED_ORIGINS` | Comma-separated browser origins (e.g. `https://staging.cursor-sync.com`). When unset, the API reflects the request `Origin` header (or `*` when absent). |
+| `CORS_ALLOWED_ORIGIN_PATTERNS` | Optional comma-separated `https` origin suffix patterns (e.g. Vercel previews). Applies only when `CORS_ALLOWED_ORIGINS` is set. |
+| `RESEND_FROM_EMAIL` / `RESEND_FROM_NAME` | Verification email sender (e.g. `noreply@cursor-sync.com`, `Cursor Sync`). Required with `RESEND_API_KEY` to send mail. |
+| `VITE_API_URL` | Website: API origin baked into the Vite build (e.g. `http://localhost:8100` locally). **Required for production/staging builds**; no fallback API host. Runtime overrides: footer **Developer** panel or `?api=<url>` (stored in `localStorage`). |
 
 ### Database schema
 
@@ -171,4 +175,4 @@ WHERE id = $2;
 - Supabase, Cloudflare Workers, R2
 - Set/change master password endpoints
 - Account portal or master-password UI
-- DNS changes for sync.bergamota.dev
+- DNS changes for cursor-sync.com (DevOps-owned)

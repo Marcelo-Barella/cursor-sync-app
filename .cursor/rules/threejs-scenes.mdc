@@ -14,12 +14,12 @@ alwaysApply: false
 - Wrap ScrollTrigger and scroll-driven GSAP work in `gsap.context()` and call `revert()` in cleanup. Tweens on a mounted scene's state and `Flip` animations that must keep their end pose use `kill()` (or `progress(1).kill()`), because `revert()` writes the start values back. Do not add `@gsap/react`.
 - If WebGL fails, `useLazyScene` sets `data-webgl="off"` on the host. Give each host a CSS gradient fallback for that state.
 - Respect `prefers-reduced-motion`: skip intro timelines and freeze time-based motion.
-- Canvas textures built from `THREE.Color` must call `convertLinearToSRGB()` before they write pixels, or colors go dark and red. Keep `NeutralToneMapping` so the bergamot orange keeps its hue.
+- Canvas textures built from `THREE.Color` must call `convertLinearToSRGB()` before they write pixels, or colors go dark and red. Keep `NeutralToneMapping` so the ember orange keeps its hue.
 - Transparent lines and overlays need `depthWrite: false`, or they cut visible gaps in additive glows.
 - Custom `ShaderMaterial` fragments must end with `#include <colorspace_fragment>`.
 - Use `THREE.Timer` and `renderer.setAnimationLoop`, not `requestAnimationFrame` plus `Clock`.
 - The launch rocket frame and gantry are solid strut meshes. Do not replace them with `WireframeGeometry`. The frame grows by a world clip plane from the bell, so members do not stretch.
-- The launch planet uses `createBergamotGroundMaterial`. One relief function drives displacement, normals, and albedo. The pad direction stays flat. `?planetField=1|2|3|4` shows height, slope, normal, and albedo. `?planetExaggerate=1` and `?planetSeed=` change amplitude and seed.
+- The launch planet uses `createEmberGroundMaterial`. One relief function drives displacement, normals, and albedo. The pad direction stays flat. `?planetField=1|2|3|4` shows height, slope, normal, and albedo. `?planetExaggerate=1` and `?planetSeed=` change amplitude and seed.
 - Gas-giant cloud motion uses `attachBandAdvection`: latitude-dependent map UV shift. Do not spin the surface mesh. That drags the terminator with the clouds. Tilt the body group so the limb matches the surface.
 - Orbit items come from `SYNCED_FILES` (`lib/syncedFiles.ts`) through `createFileSystemOrbits`. One seed fixes the lanes in `fileOrbitLayout.ts`. Forward is the analytic lane tangent, up is the planet radial. Follow that frame with `quaternion.slerp` and `1 - exp(-lambda * dt)`, then roll around local X. Spin each dashed lane ring on its normal with the lane mean anomaly (`LineDashedMaterial` in three r186 has no `dashOffset`).
 - A file body is a white page with the VS Code glyph for its extension: `{ }` for `.json`, the markdown mark for `.md`, and a folded page when there is no extension. Folder meshes stay the tabbed box. Plain file-name labels do not draw a status dot.

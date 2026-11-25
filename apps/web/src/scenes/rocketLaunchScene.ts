@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import gsap from "gsap";
 import { createSceneStage, type Disposable } from "./sceneStage";
-import { createBergamotGroundMaterial, createGlowMaterial, createSoftDotTexture, createStarField } from "./celestialBodies";
+import { createEmberGroundMaterial, createGlowMaterial, createSoftDotTexture, createStarField } from "./celestialBodies";
 import { createLaunchPad, createRocketModel, ROCKET_FRAME_BASE_Y, ROCKET_FRAME_HEIGHT, type RocketModel } from "./rocketParts";
 
 export type RocketFlight = { mission: number };
@@ -27,7 +27,7 @@ function phaseProgress(mission: number, phaseStart: number): number {
 
 function createHomeWorld(disposables: Disposable[]): THREE.Group {
   const worldGeometry = new THREE.SphereGeometry(WORLD_RADIUS, 192, 128);
-  const worldMaterial = createBergamotGroundMaterial(WORLD_RADIUS);
+  const worldMaterial = createEmberGroundMaterial(WORLD_RADIUS);
   const rimMaterial = createGlowMaterial("rim", "#ffd7af", 0.55);
   const haloMaterial = createGlowMaterial("halo", "#e87a2e", 0.55);
   disposables.push(worldGeometry, worldMaterial, rimMaterial, haloMaterial);

@@ -65,7 +65,7 @@
 }
 
 .sync-story-step-button:focus-visible {
-  outline: 1px solid var(--color-bergamota);
+  outline: 1px solid var(--color-accent);
   outline-offset: 6px;
 }
 
@@ -86,7 +86,7 @@
 }
 
 .sync-story-step.is-active .sync-story-step-number {
-  color: var(--color-bergamota-light);
+  color: var(--color-accent-light);
   text-shadow: 0 0 12px rgba(232, 122, 46, 0.6);
 }
 
@@ -130,7 +130,7 @@
 }
 
 .sync-story-tick.is-lit {
-  background: var(--color-bergamota);
+  background: var(--color-accent);
   box-shadow: 0 0 8px rgba(232, 122, 46, 0.7);
 }
 

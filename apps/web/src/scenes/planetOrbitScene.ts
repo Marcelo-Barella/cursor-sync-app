@@ -2,7 +2,7 @@ import * as THREE from "three";
 import gsap from "gsap";
 import { createSceneStage, type Disposable } from "./sceneStage";
 import {
-  BERGAMOT_PLANET_PALETTE,
+  EMBER_PLANET_PALETTE,
   OBSIDIAN_PLANET_PALETTE,
   attachBandAdvection,
   createGlowMaterial,
@@ -14,7 +14,7 @@ import {
 import { createFileLabelSprite, loadLabelFont } from "./orbitFileLabel";
 import { createPassphraseKey, createSyncRelay } from "./syncStoryProps";
 
-export type PlanetTheme = "bergamot" | "obsidian";
+export type PlanetTheme = "ember" | "obsidian";
 
 export type OrbitStory = {
   arrival: number;
@@ -50,7 +50,7 @@ type OrbitFile = {
 type ThemeStyle = { palette: PlanetPalette; halo: string; rim: string; emissive: number; haloOpacity: number };
 
 const THEME_STYLES: Record<PlanetTheme, ThemeStyle> = {
-  bergamot: { palette: BERGAMOT_PLANET_PALETTE, halo: "#e87a2e", rim: "#ffd7af", emissive: 0.22, haloOpacity: 0.45 },
+  ember: { palette: EMBER_PLANET_PALETTE, halo: "#e87a2e", rim: "#ffd7af", emissive: 0.22, haloOpacity: 0.45 },
   obsidian: { palette: OBSIDIAN_PLANET_PALETTE, halo: "#06b6d4", rim: "#64dcff", emissive: 0.06, haloOpacity: 0.16 },
 };
 

@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import {
-  BERGAMOT_PLANET_PALETTE,
+  EMBER_PLANET_PALETTE,
   OBSIDIAN_PLANET_PALETTE,
   attachBandAdvection,
   createGlowMaterial,
@@ -11,7 +11,7 @@ import {
 import { ORBIT_PLANET_RADIUS } from "./fileOrbitLayout";
 import type { Disposable } from "./sceneStage";
 
-export type PlanetTheme = "bergamot" | "obsidian";
+export type PlanetTheme = "ember" | "obsidian";
 
 export type GlowPlanet = {
   group: THREE.Group;
@@ -29,7 +29,7 @@ type PlanetStyle = {
 };
 
 const PLANET_STYLES: Record<PlanetTheme, PlanetStyle> = {
-  bergamot: { palette: BERGAMOT_PLANET_PALETTE, seed: 3.1, halo: "#e87a2e", rim: "#ffd7af", emissive: 0.22, glowOpacity: 0.45 },
+  ember: { palette: EMBER_PLANET_PALETTE, seed: 3.1, halo: "#e87a2e", rim: "#ffd7af", emissive: 0.22, glowOpacity: 0.45 },
   obsidian: { palette: OBSIDIAN_PLANET_PALETTE, seed: 7.3, halo: "#06b6d4", rim: "#64dcff", emissive: 0.06, glowOpacity: 0.16 },
 };
 const HALO_STRENGTH = 0.75;

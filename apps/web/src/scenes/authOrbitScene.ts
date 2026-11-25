@@ -19,7 +19,7 @@ export type AuthOrbitScene = {
 
 const ORBIT_SEED = 20261008;
 const CYAN_HALO = new THREE.Color("#06b6d4");
-const BERGAMOT_HALO = new THREE.Color("#e87a2e");
+const EMBER_HALO = new THREE.Color("#e87a2e");
 const CAMERA_POSITION = new THREE.Vector3(0, 1.2, 11);
 const CAMERA_LOOK = new THREE.Vector3(0, 0, 0);
 const easeOutCubic = gsap.parseEase("power3.out");
@@ -52,7 +52,7 @@ export async function createAuthOrbitScene(host: HTMLElement, state: AuthOrbitSt
     const expand = easeInOut(state.expand);
     orbitSystem.scale.setScalar((0.6 + 0.4 * intro) * (1 + 0.2 * expand));
     orbits.group.scale.setScalar(1 + 0.25 * expand);
-    planet.haloColor.copy(CYAN_HALO).lerp(BERGAMOT_HALO, expand);
+    planet.haloColor.copy(CYAN_HALO).lerp(EMBER_HALO, expand);
     planet.update(elapsedSeconds, motionScale, intro * (1 + 0.8 * Math.sin(Math.PI * state.expand)));
     orbits.update(deltaSeconds, motionScale, camera.position);
   });
