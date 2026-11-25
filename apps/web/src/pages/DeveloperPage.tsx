@@ -115,11 +115,9 @@ export function DeveloperPage() {
           {message ? <p className="developer-message">{message}</p> : null}
 
           <p className="developer-hint">
-            You can also set{" "}
-            <code className="developer-inline-code">?api=&lt;url&gt;</code> in the
-            address bar; a valid value is saved here automatically. Use{" "}
-            <code className="developer-inline-code">?api=clear</code> to remove the
-            stored override.
+            Production and staging builds use the API URL baked in at build time (
+            <code className="developer-inline-code">VITE_API_URL</code>); browser
+            overrides are not used for auth.
           </p>
         </div>
       </main>
