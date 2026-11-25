@@ -53,7 +53,7 @@ npm install
 npm run dev:web
 ```
 
-The website calls the API at `VITE_API_URL` (see `.env.example`). For a one-off override in the browser, open **Developer** in the footer or use `?api=<url>` on any page.
+The website calls the API at `VITE_API_URL` (see `.env.example`). In local `npm run dev` only, you can point at another API via the **Developer** page or `?api=<url>` (localhost / 127.0.0.1 / `VITE_DEV_API_ALLOWLIST` only). Production and staging builds ignore runtime overrides.
 
 **Staging website build** (API URL from env file; no hard-coded API host in the bundle):
 
@@ -155,7 +155,8 @@ See `.env.example`:
 | `CORS_ALLOWED_ORIGINS` | Comma-separated browser origins (e.g. `https://staging.cursor-sync.com`). When unset, the API reflects the request `Origin` header (or `*` when absent). |
 | `CORS_ALLOWED_ORIGIN_PATTERNS` | Optional comma-separated `https` origin suffix patterns (e.g. Vercel previews). Applies only when `CORS_ALLOWED_ORIGINS` is set. |
 | `RESEND_FROM_EMAIL` / `RESEND_FROM_NAME` | Verification email sender (e.g. `noreply@cursor-sync.com`, `Cursor Sync`). Required with `RESEND_API_KEY` to send mail. |
-| `VITE_API_URL` | Website: API origin baked into the Vite build (e.g. `http://localhost:8100` locally). **Required for production/staging builds**; no fallback API host. Runtime overrides: footer **Developer** panel or `?api=<url>` (stored in `localStorage`). |
+| `VITE_API_URL` | Website: HTTPS API origin baked into production/staging builds (origin only; required for auth). Local dev defaults to `http://localhost:8100` when unset. See `apps/web/docs/SECURITY_HEADERS.md`. |
+| `VITE_DEV_API_ALLOWLIST` | Optional comma-separated API origins allowed for dev-only overrides (`?api=` / Developer page). |
 
 ### Database schema
 

@@ -1,5 +1,7 @@
 node_modules/
 dist/
+apps/web/.generated-security-headers.json
+apps/web/nginx.conf
 .env
 *.log
 .DS_Store
