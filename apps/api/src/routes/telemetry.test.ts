@@ -7,11 +7,59 @@ import {
   resetGa4TelemetryState,
 } from "../lib/telemetry-ga4.js";
 import { resetTelemetryRateLimits } from "../lib/telemetry-rate-limit.js";
-import { TELEMETRY_MAX_BODY_BYTES } from "../lib/telemetry-validate.js";
+import { DEFAULT_TELEMETRY_EVENT_ALLOWLIST } from "../lib/telemetry-allowlist.js";
+import {
+  TELEMETRY_MAX_BODY_BYTES,
+  validateTelemetryBody,
+} from "../lib/telemetry-validate.js";
 import { createTelemetryRoutes } from "./telemetry.js";
 
 const TEST_SECRET = "telemetry-test-jwt-secret-with-enough-entropy";
 const TEST_GA4_SECRET = "test-ga4-api-secret-value";
+const EXTENSION_CLIENT_ID = "dfeff006-e29b-41d4-a716-446655440000";
+
+const EXTENSION_TELEMETRY_BODIES = [
+  {
+    client_id: EXTENSION_CLIENT_ID,
+    events: [{ name: "user_configured", params: { has_existing_gist: true } }],
+  },
+  {
+    client_id: EXTENSION_CLIENT_ID,
+    events: [
+      {
+        name: "sync_completed",
+        params: {
+          direction: "push",
+          file_count: 12,
+          trigger: "manual",
+          is_new_gist: false,
+        },
+      },
+    ],
+  },
+  {
+    client_id: EXTENSION_CLIENT_ID,
+    events: [
+      {
+        name: "sync_failed",
+        params: {
+          direction: "pull",
+          reason: "AUTH_FAILED",
+          trigger: "scheduled",
+          status_code: 401,
+        },
+      },
+    ],
+  },
+  {
+    client_id: EXTENSION_CLIENT_ID,
+    events: [{ name: "scheduled_sync_skipped", params: { reason: "in_progress" } }],
+  },
+  {
+    client_id: EXTENSION_CLIENT_ID,
+    events: [{ name: "scheduled_sync_failed", params: { reason: "exception" } }],
+  },
+] as const;
 
 function telemetryApp(forwardTelemetry = forwardTelemetryToGa4) {
   return createTelemetryRoutes({ forwardTelemetry });
@@ -178,5 +226,54 @@ describe("POST /v1/telemetry", () => {
     assert.notEqual(capturedUserId, email);
     assert.notEqual(capturedUserId, userId);
     assert.equal(capturedUserId!.length, 64);
+  });
+
+  it("includes cursor-sync extension events in the default allowlist", () => {
+    for (const event of [
+      "user_configured",
+      "sync_completed",
+      "sync_failed",
+      "scheduled_sync_skipped",
+      "scheduled_sync_failed",
+    ]) {
+      assert.ok(
+        DEFAULT_TELEMETRY_EVENT_ALLOWLIST.includes(
+          event as (typeof DEFAULT_TELEMETRY_EVENT_ALLOWLIST)[number]
+        )
+      );
+    }
+  });
+
+  it("accepts bodies shaped like cursor-sync src/analytics.ts sendEvent", async () => {
+    process.env.GA4_MEASUREMENT_ID = "G-EXT";
+    process.env.GA4_API_SECRET = TEST_GA4_SECRET;
+    const forwarded: string[] = [];
+    const app = telemetryApp(async (payload) => {
+      for (const event of payload.events) {
+        forwarded.push(event.name);
+      }
+    });
+
+    for (const body of EXTENSION_TELEMETRY_BODIES) {
+      const wireBody = JSON.stringify(body);
+      const validated = validateTelemetryBody(wireBody);
+      assert.equal(validated.ok, true, `validate failed: ${JSON.stringify(validated)}`);
+
+      const response = await app.request("/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: wireBody,
+      });
+      assert.equal(response.status, 204, `POST failed for ${body.events[0]!.name}`);
+      assert.equal(await response.text(), "");
+    }
+
+    assert.deepEqual(forwarded, [
+      "user_configured",
+      "sync_completed",
+      "sync_failed",
+      "scheduled_sync_skipped",
+      "scheduled_sync_failed",
+    ]);
   });
 });

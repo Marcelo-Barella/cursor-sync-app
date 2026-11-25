@@ -5,6 +5,11 @@ export const DEFAULT_TELEMETRY_EVENT_ALLOWLIST = [
   "sign_up",
   "login",
   "error",
+  "user_configured",
+  "sync_completed",
+  "sync_failed",
+  "scheduled_sync_skipped",
+  "scheduled_sync_failed",
 ] as const;
 
 export function resolveTelemetryEventAllowlist(): Set<string> {
