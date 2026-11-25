@@ -67,6 +67,21 @@ test("set allowlist: disallowed origin has no ACAO", async () => {
   assert.equal(response.headers.get("Access-Control-Allow-Origin"), null);
 });
 
+test("set allowlist: evil Vercel lookalike origin gets 403 on preflight", async () => {
+  process.env.CORS_ALLOWED_ORIGINS = "https://staging.cursor-sync.com";
+  delete process.env.CORS_ALLOWED_ORIGIN_PATTERNS;
+  const app = createApp();
+  const response = await app.request("/health", {
+    method: "OPTIONS",
+    headers: {
+      Origin: "https://evil-marcelo-barellas-projects.vercel.app",
+      "Access-Control-Request-Method": "GET",
+    },
+  });
+  assert.equal(response.status, 403);
+  assert.equal(response.headers.get("Access-Control-Allow-Origin"), null);
+});
+
 test("no Origin header succeeds without ACAO when allowlist unset", async () => {
   delete process.env.CORS_ALLOWED_ORIGINS;
   delete process.env.CORS_ALLOWED_ORIGIN_PATTERNS;

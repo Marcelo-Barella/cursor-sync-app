@@ -4,7 +4,8 @@ import {
   findInsecureHttpCorsOriginsInProduction,
   isCorsAllowlistConfigured,
   logCorsStartup,
-  originMatchesAllowedPattern,
+  parseCorsAllowlistEntry,
+  parseCorsAllowedOrigins,
   resetCorsRejectWarnForTests,
   resolveCorsOrigin,
 } from "./cors.js";
@@ -43,14 +44,50 @@ test("treats empty allowlist env as unset", () => {
   assert.equal(isCorsAllowlistConfigured(), false);
 });
 
-test("findInsecureHttpCorsOriginsInProduction flags http non-loopback in production", () => {
+test("rejects wildcard entries at config parse", () => {
+  const parsed = parseCorsAllowlistEntry(
+    "https://*-marcelo-barellas-projects.vercel.app"
+  );
+  assert.equal(parsed.ok, false);
+  if (!parsed.ok) {
+    assert.match(parsed.reason, /wildcards/i);
+  }
+
+  const list = parseCorsAllowedOrigins(
+    "https://staging.cursor-sync.com,*-evil.vercel.app"
+  );
+  assert.deepEqual(list.allowed, ["https://staging.cursor-sync.com"]);
+  assert.equal(list.rejected.length, 1);
+});
+
+test("normalizes trailing slashes in allowlist entries", () => {
+  const parsed = parseCorsAllowlistEntry("https://staging.cursor-sync.com/");
+  assert.equal(parsed.ok, true);
+  if (parsed.ok) {
+    assert.equal(parsed.origin, "https://staging.cursor-sync.com");
+  }
+});
+
+test("origin comparison is case- and port-exact", () => {
+  process.env.CORS_ALLOWED_ORIGINS = "https://staging.cursor-sync.com";
+  delete process.env.CORS_ALLOWED_ORIGIN_PATTERNS;
+  assert.equal(
+    resolveCorsOrigin("https://STAGING.cursor-sync.com"),
+    null
+  );
+  process.env.CORS_ALLOWED_ORIGINS = "http://localhost:3000";
+  assert.equal(resolveCorsOrigin("http://localhost:3001"), null);
+  assert.equal(resolveCorsOrigin("http://localhost:3000"), "http://localhost:3000");
+});
+
+test("findInsecureHttpCorsOriginsInProduction leaves only loopback http origins", () => {
   assert.deepEqual(
     findInsecureHttpCorsOriginsInProduction({
       NODE_ENV: "production",
       CORS_ALLOWED_ORIGINS:
         "https://staging.cursor-sync.com,http://insecure.example",
     }),
-    ["http://insecure.example"]
+    []
   );
   assert.deepEqual(
     findInsecureHttpCorsOriginsInProduction({
@@ -68,7 +105,7 @@ test("findInsecureHttpCorsOriginsInProduction flags http non-loopback in product
   );
 });
 
-test("logCorsStartup errors on insecure http origins in production", () => {
+test("logCorsStartup rejects http non-loopback allowlist entries", () => {
   const errors: string[] = [];
   const originalError = console.error;
   const originalEnv = process.env;
@@ -82,7 +119,7 @@ test("logCorsStartup errors on insecure http origins in production", () => {
       CORS_ALLOWED_ORIGINS: "http://evil.example",
     };
     logCorsStartup();
-    assert.ok(errors.some((line) => /non-HTTPS origins/i.test(line)));
+    assert.ok(errors.some((line) => /rejected entry/i.test(line)));
   } finally {
     process.env = originalEnv;
     console.error = originalError;
@@ -105,6 +142,23 @@ test("logCorsStartup errors once when allowlist unset", () => {
   }
 });
 
+test("logCorsStartup warns when origin patterns env is set", () => {
+  const warnings: string[] = [];
+  const originalWarn = console.warn;
+  console.warn = (message?: unknown) => {
+    warnings.push(String(message));
+  };
+  try {
+    process.env.CORS_ALLOWED_ORIGINS = "https://staging.cursor-sync.com";
+    process.env.CORS_ALLOWED_ORIGIN_PATTERNS =
+      "*-marcelo-barellas-projects.vercel.app";
+    logCorsStartup();
+    assert.ok(warnings.some((line) => /ignored/i.test(line)));
+  } finally {
+    console.warn = originalWarn;
+  }
+});
+
 test("allows only configured origins when allowlist env is set", () => {
   delete process.env.CORS_ALLOWED_ORIGIN_PATTERNS;
   process.env.CORS_ALLOWED_ORIGINS =
@@ -116,51 +170,7 @@ test("allows only configured origins when allowlist env is set", () => {
   assert.equal(resolveCorsOrigin("https://evil.example"), null);
 });
 
-test("allows Vercel preview origins when origin patterns env is set", () => {
-  process.env.CORS_ALLOWED_ORIGINS = "https://staging.cursor-sync.com";
-  process.env.CORS_ALLOWED_ORIGIN_PATTERNS =
-    "*-marcelo-barellas-projects.vercel.app";
-  assert.equal(
-    resolveCorsOrigin(
-      "https://cursor-sync-app-git-feature-marcelo-barellas-projects.vercel.app"
-    ),
-    "https://cursor-sync-app-git-feature-marcelo-barellas-projects.vercel.app"
-  );
-  assert.equal(
-    resolveCorsOrigin(
-      "https://cursor-sync-abc123-marcelo-barellas-projects.vercel.app"
-    ),
-    "https://cursor-sync-abc123-marcelo-barellas-projects.vercel.app"
-  );
-});
-
-test("denies lookalike and non-https origins for patterns", () => {
-  const pattern = "*-marcelo-barellas-projects.vercel.app";
-  process.env.CORS_ALLOWED_ORIGINS = "https://staging.cursor-sync.com";
-  process.env.CORS_ALLOWED_ORIGIN_PATTERNS = pattern;
-  assert.equal(
-    originMatchesAllowedPattern(
-      "https://evil-marcelo-barellas-projects.vercel.app.attacker.com",
-      pattern
-    ),
-    false
-  );
-  assert.equal(
-    originMatchesAllowedPattern(
-      "http://cursor-sync-abc123-marcelo-barellas-projects.vercel.app",
-      pattern
-    ),
-    false
-  );
-  assert.equal(
-    resolveCorsOrigin(
-      "https://evil-marcelo-barellas-projects.vercel.app.attacker.com"
-    ),
-    null
-  );
-});
-
-test("ignores origin patterns when pattern env is unset", () => {
+test("denies unlisted Vercel preview origins without pattern allowlist", () => {
   process.env.CORS_ALLOWED_ORIGINS = "https://staging.cursor-sync.com";
   delete process.env.CORS_ALLOWED_ORIGIN_PATTERNS;
   assert.equal(
@@ -169,16 +179,8 @@ test("ignores origin patterns when pattern env is unset", () => {
     ),
     null
   );
-});
-
-test("ignores origin patterns when allowlist env is unset", () => {
-  delete process.env.CORS_ALLOWED_ORIGINS;
-  process.env.CORS_ALLOWED_ORIGIN_PATTERNS =
-    "*-marcelo-barellas-projects.vercel.app";
   assert.equal(
-    resolveCorsOrigin(
-      "https://cursor-sync-abc123-marcelo-barellas-projects.vercel.app"
-    ),
+    resolveCorsOrigin("https://evil-marcelo-barellas-projects.vercel.app"),
     null
   );
 });

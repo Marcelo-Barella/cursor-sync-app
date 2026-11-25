@@ -284,6 +284,9 @@ export async function deleteUserObjectsDetailed(
   });
 }
 
+export const R2_TEMP_CREDENTIALS_MIN_TTL_SECONDS = 1;
+export const R2_TEMP_CREDENTIALS_MAX_TTL_SECONDS = 604_800;
+
 export async function mintTempCredentials(
   config: R2Config,
   userId: string,

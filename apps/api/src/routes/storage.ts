@@ -7,6 +7,8 @@ import {
   getR2Config,
   listPlaintextUserObjects,
   mintTempCredentials,
+  R2_TEMP_CREDENTIALS_MAX_TTL_SECONDS,
+  R2_TEMP_CREDENTIALS_MIN_TTL_SECONDS,
 } from "../lib/r2.js";
 import { requireAuth, type AuthVariables } from "../middleware/auth.js";
 import { requireEmailVerified } from "../middleware/require-email-verified.js";
@@ -14,7 +16,12 @@ import { requireEmailVerified } from "../middleware/require-email-verified.js";
 const DEFAULT_TTL_SECONDS = 900;
 
 const credentialsBodySchema = z.object({
-  ttlSeconds: z.number().int().positive().optional(),
+  ttlSeconds: z
+    .number()
+    .int()
+    .min(R2_TEMP_CREDENTIALS_MIN_TTL_SECONDS)
+    .max(R2_TEMP_CREDENTIALS_MAX_TTL_SECONDS)
+    .optional(),
 });
 
 const deletePlaintextBodySchema = z.object({
@@ -75,25 +82,41 @@ storageRoutes.post(
   }
 );
 
-storageRoutes.post("/credentials", requireAuth, async (c) => {
-  const config = getR2Config();
-  if (!config) {
-    return c.json({ error: "Storage credentials unavailable" }, 503);
-  }
+storageRoutes.post(
+  "/credentials",
+  requireAuth,
+  requireEmailVerified,
+  async (c) => {
+    const config = getR2Config();
+    if (!config) {
+      return c.json({ error: "Storage credentials unavailable" }, 503);
+    }
 
-  const rawBody = await c.req.json().catch(() => ({}));
-  const parsed = credentialsBodySchema.safeParse(rawBody);
-  if (!parsed.success) {
-    return c.json({ error: "Invalid request body" }, 400);
-  }
+    const rawBody = await c.req.json().catch(() => ({}));
+    const parsed = credentialsBodySchema.safeParse(rawBody);
+    if (!parsed.success) {
+      const ttlIssue = parsed.error.issues.find((issue) =>
+        issue.path.includes("ttlSeconds")
+      );
+      if (ttlIssue) {
+        return c.json(
+          {
+            error: `ttlSeconds must be an integer between ${R2_TEMP_CREDENTIALS_MIN_TTL_SECONDS} and ${R2_TEMP_CREDENTIALS_MAX_TTL_SECONDS}`,
+          },
+          400
+        );
+      }
+      return c.json({ error: "Invalid request body" }, 400);
+    }
 
-  const ttlSeconds = parsed.data.ttlSeconds ?? DEFAULT_TTL_SECONDS;
-  const userId = c.get("userId");
+    const ttlSeconds = parsed.data.ttlSeconds ?? DEFAULT_TTL_SECONDS;
+    const userId = c.get("userId");
 
-  try {
-    const credentials = await mintTempCredentials(config, userId, ttlSeconds);
-    return c.json(credentials);
-  } catch {
-    return c.json({ error: "Failed to mint storage credentials" }, 502);
+    try {
+      const credentials = await mintTempCredentials(config, userId, ttlSeconds);
+      return c.json(credentials);
+    } catch {
+      return c.json({ error: "Failed to mint storage credentials" }, 502);
+    }
   }
-});
+);
