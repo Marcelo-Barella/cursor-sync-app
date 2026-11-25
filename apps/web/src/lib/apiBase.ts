@@ -186,6 +186,15 @@ export function getApiBaseUrl(): string {
   return defaultApiBaseForMode(import.meta.env.MODE);
 }
 
+export function getBuildTimeOnlyApiBaseUrlForAuth(): string | null {
+  const resolved = resolveBundledApiBase({}, import.meta.env.MODE);
+  const normalized = normalizeApiBaseUrl(resolved);
+  if (normalized) {
+    return normalized;
+  }
+  return null;
+}
+
 export function getApiBaseUrlForAuth(): string | null {
   if (!import.meta.env.DEV) {
     const buildTimeRaw = readBuildTimeApiUrl();

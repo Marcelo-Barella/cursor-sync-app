@@ -88,7 +88,7 @@ const apiOrigin = parseApiOriginForCsp(viteApiUrl);
 
 if (!apiOrigin) {
   console.error(
-    "[generate-security-headers] VITE_API_URL must be a valid https origin (no path or credentials)."
+    "[generate-security-headers] VITE_API_URL must be a valid origin (https or local http)."
   );
   if (process.env.SKIP_SECURITY_HEADERS === "1") {
     console.warn("[generate-security-headers] SKIP_SECURITY_HEADERS=1 — skipping.");
@@ -98,34 +98,6 @@ if (!apiOrigin) {
 }
 
 const csp = buildContentSecurityPolicy(apiOrigin);
-const sharedHeaders = [
-  {
-    key: "Content-Security-Policy",
-    value: csp,
-  },
-  {
-    key: "Referrer-Policy",
-    value: REFERRER_POLICY,
-  },
-  {
-    key: "X-Content-Type-Options",
-    value: "nosniff",
-  },
-  {
-    key: "Permissions-Policy",
-    value: PERMISSIONS_POLICY,
-  },
-];
-
-const vercelPath = path.join(appRoot, "vercel.json");
-const vercel = JSON.parse(fs.readFileSync(vercelPath, "utf8"));
-vercel.headers = [
-  {
-    source: "/(.*)",
-    headers: sharedHeaders,
-  },
-];
-fs.writeFileSync(vercelPath, `${JSON.stringify(vercel, null, 2)}\n`);
 
 const nginxTemplatePath = path.join(appRoot, "nginx.conf.template");
 const nginxOutPath = path.join(appRoot, "nginx.conf");
@@ -133,7 +105,8 @@ const template = fs.readFileSync(nginxTemplatePath, "utf8");
 const nginx = template
   .replaceAll("__CONTENT_SECURITY_POLICY__", csp)
   .replaceAll("__REFERRER_POLICY__", REFERRER_POLICY)
-  .replaceAll("__PERMISSIONS_POLICY__", PERMISSIONS_POLICY);
+  .replaceAll("__PERMISSIONS_POLICY__", PERMISSIONS_POLICY)
+  .replaceAll("__X_FRAME_OPTIONS__", "DENY");
 fs.writeFileSync(nginxOutPath, nginx);
 
 const metaPath = path.join(appRoot, ".generated-security-headers.json");
@@ -143,5 +116,5 @@ fs.writeFileSync(
 );
 
 console.log(
-  `[generate-security-headers] connect-src API origin: ${apiOrigin}`
+  `[generate-security-headers] nginx connect-src API origin: ${apiOrigin}`
 );

@@ -1,22 +1,25 @@
 # Web security headers
 
-Production and staging deployments set HTTP response headers from `VITE_API_URL` at build time.
+## Vercel (static `vercel.json`)
 
-## Build pipeline
+`apps/web/vercel.json` is **committed as-is** (not modified at build time). Header rules are ordered so Vercel applies the fallback first and **later matching rules override the same header name**:
 
-`npm run build` and `npm run build:staging` run `scripts/generate-security-headers.mjs` before TypeScript and Vite, then Vite injects the same CSP (and Referrer-Policy meta) into `index.html` for hosts that serve the SPA without custom HTTP headers (for example some static hosts). The script:
+1. **Fallback** (no `has`) — `connect-src` includes `https://api-staging.cursor-sync.com` for `*.vercel.app` previews and other hosts.
+2. **`staging.cursor-sync.com`** — staging API in `connect-src`.
+3. **`cursor-sync.com` / `www.cursor-sync.com`** — production API in `connect-src`.
 
-1. Validates `VITE_API_URL` as an origin-only URL (no userinfo; path must be `/` or empty). HTTPS is required for remote hosts; `http://localhost` and `http://127.0.0.1` are allowed for local Docker.
-2. Merges the same directives into `vercel.json` `headers` when that file is present (useful for self-hosted previews). Vercel also receives CSP via the built `index.html` meta tag because platform routing is fixed before the build step runs.
-3. Renders `nginx.conf` from `nginx.conf.template` for the Docker/nginx image.
-4. Records the resolved policy in `.generated-security-headers.json` (build artifact, gitignored).
+Each rule sets `Content-Security-Policy` (including `frame-ancestors 'none'`), `X-Frame-Options: DENY`, `Strict-Transport-Security: max-age=63072000; includeSubDomains`, `Referrer-Policy`, `X-Content-Type-Options`, and `Permissions-Policy`.
 
-`connect-src` always includes `'self'` and the validated API origin exactly.
+Tests in `src/lib/vercelJsonHeaders.test.ts` parse this file and assert host-specific `connect-src`, framing protection, and allowed origins.
 
-## Policy shape
+## Docker / nginx
 
-See `src/lib/csp.ts` for the canonical directive list. Google Fonts are allowed in `style-src` and `font-src`; the app does not load third-party scripts or analytics. `style-src 'unsafe-inline'` is required for existing component inline styles.
+`npm run build` runs `scripts/generate-security-headers.mjs`, which renders `nginx.conf` from `nginx.conf.template` using the build’s `VITE_API_URL` (local `http://localhost:8100` allowed).
 
-## API base override (removed in production)
+## HTML meta (defense in depth)
 
-Runtime `?api=` and `localStorage` overrides are dev-only. Production and staging bundles resolve the API host only from `VITE_API_URL`. On every load, poisoned `localStorage` keys are deleted and `api` is removed from the query string.
+Vite injects a **meta** CSP without `frame-ancestors` (ignored in meta policies) and with `connect-src 'self'` plus **both** API origins so the effective policy intersects cleanly with the host-specific HTTP header. Framing protection comes from the HTTP response headers on Vercel.
+
+## API base override (production)
+
+Runtime `?api=` and `localStorage` overrides are dev-only. See the root README.

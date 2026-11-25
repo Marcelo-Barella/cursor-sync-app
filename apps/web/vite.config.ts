@@ -2,10 +2,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig, loadEnv, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
-import {
-  buildContentSecurityPolicy,
-  parseApiOriginForCsp,
-} from "./src/lib/csp";
+import { buildMetaContentSecurityPolicyValue } from "./src/lib/csp";
 
 const webRoot = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(webRoot, "../..");
@@ -28,26 +25,24 @@ export default defineConfig(({ mode }) => {
       JSON.stringify(vitePublicSiteHost);
   }
 
-  const apiOrigin = viteApiUrl ? parseApiOriginForCsp(viteApiUrl) : null;
-
   return {
     envDir: repoRoot,
     define,
-    plugins: [react(), securityHeadersHtmlPlugin(apiOrigin)],
+    plugins: [react(), securityHeadersHtmlPlugin(Boolean(viteApiUrl))],
     server: {
       port: 3000,
     },
   };
 });
 
-function securityHeadersHtmlPlugin(apiOrigin: string | null): Plugin {
+function securityHeadersHtmlPlugin(includeMetaCsp: boolean): Plugin {
   return {
     name: "cursor-sync-security-headers-html",
     transformIndexHtml(html) {
-      if (!apiOrigin) {
+      if (!includeMetaCsp) {
         return html;
       }
-      const csp = buildContentSecurityPolicy(apiOrigin);
+      const csp = buildMetaContentSecurityPolicyValue();
       const tags = [
         `<meta http-equiv="Content-Security-Policy" content="${csp}" />`,
         `<meta name="referrer" content="strict-origin-when-cross-origin" />`,
