@@ -1,62 +1,9 @@
-function parseHttpsOrigin(origin: string): URL | null {
-  try {
-    const url = new URL(origin);
-    if (url.protocol !== "https:") {
-      return null;
-    }
-    if (url.username || url.password || url.pathname !== "/" || url.search || url.hash) {
-      return null;
-    }
-    return url;
-  } catch {
-    return null;
-  }
-}
-
-export function originMatchesAllowedPattern(origin: string, pattern: string): boolean {
-  const trimmed = pattern.trim();
-  if (!trimmed.startsWith("*")) {
-    return false;
-  }
-
-  const suffix = trimmed.slice(1);
-  if (!suffix || suffix.includes("*")) {
-    return false;
-  }
-
-  const url = parseHttpsOrigin(origin);
-  if (!url) {
-    return false;
-  }
-
-  const host = url.hostname;
-  if (!host.endsWith(suffix) || host.length <= suffix.length) {
-    return false;
-  }
-
-  const prefix = host.slice(0, host.length - suffix.length);
-  if (!prefix || !/^[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?$/.test(prefix)) {
-    return false;
-  }
-
-  return true;
-}
-
-function matchesAnyOriginPattern(origin: string, patternsRaw: string): boolean {
-  const patterns = patternsRaw
-    .split(",")
-    .map((entry) => entry.trim())
-    .filter(Boolean);
-
-  return patterns.some((pattern) => originMatchesAllowedPattern(origin, pattern));
-}
-
 const CORS_REJECT_WARN_INTERVAL_MS = 60_000;
 let lastCorsRejectWarnAt = 0;
 
-export function isCorsAllowlistConfigured(): boolean {
-  return Boolean(process.env.CORS_ALLOWED_ORIGINS?.trim());
-}
+export type CorsAllowlistParseResult =
+  | { ok: true; origin: string }
+  | { ok: false; reason: string };
 
 function isLoopbackHost(hostname: string): boolean {
   if (hostname === "localhost" || hostname === "[::1]") {
@@ -66,6 +13,110 @@ function isLoopbackHost(hostname: string): boolean {
     return true;
   }
   return /^127(?:\.\d{1,3}){3}$/.test(hostname);
+}
+
+function parseOriginLike(value: string): URL | null {
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.includes("*")) {
+    return null;
+  }
+
+  let url: URL;
+  try {
+    url = new URL(trimmed);
+  } catch {
+    return null;
+  }
+
+  if (url.username || url.password || url.search || url.hash) {
+    return null;
+  }
+
+  const path = url.pathname;
+  if (path !== "" && path !== "/") {
+    return null;
+  }
+
+  if (url.protocol === "https:") {
+    return url;
+  }
+
+  if (url.protocol === "http:" && isLoopbackHost(url.hostname)) {
+    return url;
+  }
+
+  return null;
+}
+
+export function parseCorsAllowlistEntry(entry: string): CorsAllowlistParseResult {
+  const trimmed = entry.trim();
+  if (!trimmed) {
+    return { ok: false, reason: "empty entry" };
+  }
+  if (trimmed.includes("*")) {
+    return { ok: false, reason: "wildcards are not allowed" };
+  }
+
+  let url: URL;
+  try {
+    url = new URL(trimmed);
+  } catch {
+    return { ok: false, reason: "invalid origin URL" };
+  }
+
+  if (url.username || url.password || url.search || url.hash) {
+    return { ok: false, reason: "origin must not include userinfo, query, or fragment" };
+  }
+
+  if (url.pathname !== "" && url.pathname !== "/") {
+    return { ok: false, reason: "origin must not include a path" };
+  }
+
+  if (url.protocol === "https:") {
+    return { ok: true, origin: url.origin };
+  }
+
+  if (url.protocol === "http:" && isLoopbackHost(url.hostname)) {
+    return { ok: true, origin: url.origin };
+  }
+
+  return {
+    ok: false,
+    reason: "origin must be https, or http only for localhost or 127.0.0.1",
+  };
+}
+
+export function parseCorsAllowedOrigins(raw: string): {
+  allowed: string[];
+  rejected: Array<{ entry: string; reason: string }>;
+} {
+  const allowed: string[] = [];
+  const rejected: Array<{ entry: string; reason: string }> = [];
+
+  for (const entry of raw.split(",")) {
+    const parsed = parseCorsAllowlistEntry(entry);
+    if (parsed.ok) {
+      if (!allowed.includes(parsed.origin)) {
+        allowed.push(parsed.origin);
+      }
+    } else {
+      rejected.push({ entry: entry.trim(), reason: parsed.reason });
+    }
+  }
+
+  return { allowed, rejected };
+}
+
+export function isCorsAllowlistConfigured(): boolean {
+  return parseCorsAllowedOrigins(process.env.CORS_ALLOWED_ORIGINS ?? "").allowed.length > 0;
+}
+
+function getAllowedOriginsFromEnv(): string[] {
+  const raw = process.env.CORS_ALLOWED_ORIGINS?.trim();
+  if (!raw) {
+    return [];
+  }
+  return parseCorsAllowedOrigins(raw).allowed;
 }
 
 export function findInsecureHttpCorsOriginsInProduction(
@@ -78,12 +129,9 @@ export function findInsecureHttpCorsOriginsInProduction(
   if (!raw) {
     return [];
   }
+  const { allowed } = parseCorsAllowedOrigins(raw);
   const insecure: string[] = [];
-  for (const entry of raw.split(",")) {
-    const origin = entry.trim();
-    if (!origin) {
-      continue;
-    }
+  for (const origin of allowed) {
     try {
       const url = new URL(origin);
       if (url.protocol === "http:" && !isLoopbackHost(url.hostname)) {
@@ -97,11 +145,32 @@ export function findInsecureHttpCorsOriginsInProduction(
 }
 
 export function logCorsStartup(): void {
-  if (!isCorsAllowlistConfigured()) {
+  const patternsRaw = process.env.CORS_ALLOWED_ORIGIN_PATTERNS?.trim();
+  if (patternsRaw) {
+    console.warn(
+      "CORS_ALLOWED_ORIGIN_PATTERNS is set but ignored; use exact origins in CORS_ALLOWED_ORIGINS only"
+    );
+  }
+
+  const raw = process.env.CORS_ALLOWED_ORIGINS?.trim();
+  if (!raw) {
     console.error(
       "CORS_ALLOWED_ORIGINS is unset or empty: cross-origin browser access is denied (fail closed)"
     );
+    return;
   }
+
+  const { rejected } = parseCorsAllowedOrigins(raw);
+  for (const { entry, reason } of rejected) {
+    console.error(`CORS_ALLOWED_ORIGINS rejected entry "${entry}": ${reason}`);
+  }
+
+  if (parseCorsAllowedOrigins(raw).allowed.length === 0) {
+    console.error(
+      "CORS_ALLOWED_ORIGINS has no valid entries: cross-origin browser access is denied (fail closed)"
+    );
+  }
+
   const insecure = findInsecureHttpCorsOriginsInProduction();
   if (insecure.length > 0) {
     console.error(
@@ -126,31 +195,26 @@ export function resetCorsRejectWarnForTests(): void {
 }
 
 export function resolveCorsOrigin(requestOrigin: string | undefined): string | null {
-  const raw = process.env.CORS_ALLOWED_ORIGINS?.trim();
-  const patternsRaw = process.env.CORS_ALLOWED_ORIGIN_PATTERNS?.trim();
+  const allowed = getAllowedOriginsFromEnv();
 
-  if (!raw) {
+  if (allowed.length === 0) {
     if (requestOrigin) {
       warnCorsOriginRejectedUnsetAllowlist(requestOrigin);
     }
     return null;
   }
 
-  const allowed = raw
-    .split(",")
-    .map((entry) => entry.trim())
-    .filter(Boolean);
-
   if (!requestOrigin) {
     return allowed[0] ?? null;
   }
 
-  if (allowed.includes(requestOrigin)) {
-    return requestOrigin;
+  const requestUrl = parseOriginLike(requestOrigin);
+  if (!requestUrl) {
+    return null;
   }
 
-  if (patternsRaw && matchesAnyOriginPattern(requestOrigin, patternsRaw)) {
-    return requestOrigin;
+  if (allowed.includes(requestUrl.origin)) {
+    return requestUrl.origin;
   }
 
   return null;
