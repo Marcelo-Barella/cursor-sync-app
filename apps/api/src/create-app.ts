@@ -9,6 +9,7 @@ import { configsRoutes } from "./routes/configs.js";
 import { keysRoutes } from "./routes/keys.js";
 import { loginRoutes } from "./routes/login.js";
 import { storageRoutes } from "./routes/storage.js";
+import { telemetryRoutes } from "./routes/telemetry.js";
 
 export function createApp() {
   const app = new Hono();
@@ -37,6 +38,7 @@ export function createApp() {
   app.route("/configs", configsRoutes);
   app.route("/v1/keys", keysRoutes);
   app.route("/v1/storage", storageRoutes);
+  app.route("/v1/telemetry", telemetryRoutes);
   app.route("/", loginRoutes);
 
   return app;
