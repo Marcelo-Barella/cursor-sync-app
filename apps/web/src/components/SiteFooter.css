@@ -53,6 +53,16 @@
   color: var(--color-bright);
 }
 
+.site-footer-external {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+}
+
+.site-footer-coffee-glyph {
+  flex-shrink: 0;
+}
+
 @media (max-width: 640px) {
   .site-footer-inner {
     flex-direction: column;

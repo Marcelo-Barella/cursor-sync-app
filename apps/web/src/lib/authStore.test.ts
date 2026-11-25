@@ -117,7 +117,7 @@ describe("auth store session sync", () => {
 
     expect(finish()).toBeLessThanOrEqual(1);
     expect(sessionStorage.getItem(TOKEN_STORAGE_KEY)).toBeNull();
-    expect(localStorage.getItem(AUTH_LOGOUT_BROADCAST_KEY)).not.toBeNull();
+    expect(localStorage.getItem(AUTH_LOGOUT_BROADCAST_KEY)).toBeNull();
   });
 
   it("failed getMe bootstrap clears session without recursive dispatches", async () => {

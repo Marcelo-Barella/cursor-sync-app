@@ -8,6 +8,7 @@ import { HowItSyncsSection } from "../components/HowItSyncsSection";
 import { WhatElseSection } from "../components/WhatElseSection";
 import { Nav } from "../components/Nav";
 import { SiteFooter } from "../components/SiteFooter";
+import { useAuthOptional } from "../lib/authStore";
 import { EXTENSION_LISTING_URL } from "../lib/defaults";
 import { SYNCED_FILES } from "../lib/syncedFiles";
 import { JOURNEY_LENGTH, JOURNEY_SEGMENTS, SYNC_STEP_LABELS, stepIndexAtStory } from "../lib/syncStoryTimeline";
@@ -23,6 +24,22 @@ const STORY_HASH = "#how-it-syncs";
 
 function prefersReducedMotion(): boolean {
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+function LandingHeroAuthAction() {
+  const auth = useAuthOptional();
+  if (auth?.token) {
+    return (
+      <Link className="hero-action hero-action--secondary" to="/app">
+        Open app
+      </Link>
+    );
+  }
+  return (
+    <Link className="hero-action hero-action--secondary" to="/sign-in">
+      Sign in
+    </Link>
+  );
 }
 
 export function LandingPage() {
@@ -187,9 +204,7 @@ export function LandingPage() {
                 <a className="hero-action hero-action--primary" href={EXTENSION_LISTING_URL} target="_blank" rel="noreferrer">
                   Install
                 </a>
-                <Link className="hero-action hero-action--secondary" to="/sign-in">
-                  Sign in
-                </Link>
+                <LandingHeroAuthAction />
               </div>
             </div>
             <ul className="hero-file-list" aria-label="Files that sync">

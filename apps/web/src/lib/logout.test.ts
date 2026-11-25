@@ -82,7 +82,7 @@ describe("logout", () => {
     local.setItem(API_BASE_STORAGE_KEY, "https://override.example.com");
     local.setItem(THEME_STORAGE_KEY, "dark");
 
-    clearClientAuthState({ session, local });
+    clearClientAuthState({ storage: { session, local } });
 
     for (const key of AUTH_SESSION_STORAGE_KEYS) {
       expect(session.getItem(key)).toBeNull();

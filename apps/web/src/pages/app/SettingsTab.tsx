@@ -9,7 +9,7 @@ import { useAuth } from "../../lib/authStore";
 
 export function SettingsTab() {
   const navigate = useNavigate();
-  const { email, logout } = useAuth();
+  const { email, logout, loading } = useAuth();
   const [busy, setBusy] = useState(false);
 
   async function handleLogout() {
@@ -32,7 +32,13 @@ export function SettingsTab() {
       <SettingsSection title="Account">
         <div className="settings-meta-row">
           <span className="settings-meta-label">Signed in as</span>
-          <p className="settings-meta-value">{email ?? "—"}</p>
+          <p className="settings-meta-value">
+            {loading ? (
+              <span className="settings-meta-skeleton" aria-busy="true" aria-label="Loading account" />
+            ) : (
+              (email ?? "—")
+            )}
+          </p>
         </div>
       </SettingsSection>
       <SettingsSection title="Session">

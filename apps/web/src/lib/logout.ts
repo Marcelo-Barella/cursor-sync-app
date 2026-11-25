@@ -1,3 +1,4 @@
+import { broadcastAuthLogout } from "./authSync";
 import { setStoredApiOverride } from "./apiBase";
 import {
   HANDOFF_ATTEMPTED_KEY,
@@ -25,16 +26,7 @@ export const AUTH_SESSION_STORAGE_KEYS = [
 
 export const AUTH_COOKIE_NAMES: string[] = [];
 
-export const AUTH_LOGOUT_BROADCAST_KEY = "cursor-sync-auth-logout-broadcast";
-
-export function broadcastAuthLogout(storage?: Storage): void {
-  const target =
-    storage ?? (typeof localStorage !== "undefined" ? localStorage : undefined);
-  if (!target) {
-    return;
-  }
-  target.setItem(AUTH_LOGOUT_BROADCAST_KEY, String(Date.now()));
-}
+export { AUTH_LOGOUT_BROADCAST_KEY, broadcastAuthLogout } from "./authSync";
 
 export type LogoutNavigate = (path: string, options?: { replace?: boolean }) => void;
 
@@ -58,12 +50,19 @@ export function clearAuthCookies(
   }
 }
 
-export function clearClientAuthState(storage?: {
-  session: Storage;
-  local: Storage;
-}): void {
-  const session = storage?.session ?? sessionStorage;
-  const local = storage?.local ?? localStorage;
+export type ClearClientAuthStateOptions = {
+  storage?: {
+    session: Storage;
+    local: Storage;
+  };
+  skipBroadcast?: boolean;
+};
+
+export function clearClientAuthState(
+  options?: ClearClientAuthStateOptions
+): void {
+  const session = options?.storage?.session ?? sessionStorage;
+  const local = options?.storage?.local ?? localStorage;
 
   for (const key of AUTH_SESSION_STORAGE_KEYS) {
     session.removeItem(key);
@@ -71,9 +70,18 @@ export function clearClientAuthState(storage?: {
   clearToken();
   setStoredApiOverride(null, local);
   clearMemorySession();
-  broadcastAuthLogout(local);
+  if (!options?.skipBroadcast) {
+    broadcastAuthLogout(local);
+  }
   clearAuthCookies();
   void clearE2eKeyCache();
+}
+
+export function applyRemoteLogout(storage?: {
+  session: Storage;
+  local: Storage;
+}): void {
+  clearClientAuthState({ storage, skipBroadcast: true });
 }
 
 export async function logout(options: LogoutOptions = {}): Promise<void> {

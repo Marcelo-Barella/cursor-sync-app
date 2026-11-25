@@ -1,8 +1,12 @@
 import { Link, NavLink } from "react-router-dom";
+import { useAuthOptional } from "../lib/authStore";
 import { EXTENSION_LISTING_URL } from "../lib/defaults";
 import "./Nav.css";
 
 export function Nav() {
+  const auth = useAuthOptional();
+  const signedIn = Boolean(auth?.token);
+
   return (
     <header className="nav">
       <div className="nav-inner">
@@ -17,9 +21,15 @@ export function Nav() {
           <NavLink to="/changelog" className="nav-link">
             Changelog
           </NavLink>
-          <NavLink to="/sign-in" className="nav-link">
-            Sign in
-          </NavLink>
+          {signedIn ? (
+            <NavLink to="/app" className="nav-link">
+              App
+            </NavLink>
+          ) : (
+            <NavLink to="/sign-in" className="nav-link">
+              Sign in
+            </NavLink>
+          )}
         </nav>
         <a href={EXTENSION_LISTING_URL} className="nav-install" target="_blank" rel="noreferrer">
           Install

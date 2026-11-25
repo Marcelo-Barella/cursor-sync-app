@@ -10,7 +10,12 @@ import {
 import { getMe } from "./api";
 import { readToken, saveToken } from "./auth";
 import {
-  AUTH_LOGOUT_BROADCAST_KEY,
+  broadcastAuthLogin,
+  subscribeToAuthSync,
+  redirectAfterRemoteLogout,
+} from "./authSync";
+import {
+  applyRemoteLogout,
   logout as runLogout,
   type LogoutNavigate,
 } from "./logout";
@@ -112,20 +117,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  const handleRemoteLogout = useCallback(() => {
+    const hadSession = readToken() !== null;
+    applyRemoteLogout();
+    setToken(null);
+    setEmail(null);
+    setLoading(false);
+    if (hadSession) {
+      redirectAfterRemoteLogout();
+    }
+  }, []);
+
   useEffect(() => {
     const onAuthChanged = () => refreshFromStorage();
-    const onStorage = (event: StorageEvent) => {
-      if (event.key === AUTH_LOGOUT_BROADCAST_KEY) {
-        refreshFromStorage();
+    const unsubscribe = subscribeToAuthSync((message) => {
+      if (message.type === "logout") {
+        handleRemoteLogout();
+        return;
       }
-    };
+      refreshFromStorage();
+    });
     window.addEventListener(AUTH_STATE_CHANGED_EVENT, onAuthChanged);
-    window.addEventListener("storage", onStorage);
     return () => {
       window.removeEventListener(AUTH_STATE_CHANGED_EVENT, onAuthChanged);
-      window.removeEventListener("storage", onStorage);
+      unsubscribe();
     };
-  }, [refreshFromStorage]);
+  }, [refreshFromStorage, handleRemoteLogout]);
 
   const setSession = useCallback((nextToken: string, nextEmail?: string | null) => {
     saveToken(nextToken);
@@ -133,6 +150,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setEmail(nextEmail ?? null);
     setMemorySession(nextToken, nextEmail ?? null);
     setLoading(false);
+    broadcastAuthLogin();
   }, []);
 
   const logout = useCallback(
