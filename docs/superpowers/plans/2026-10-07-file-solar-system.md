@@ -55,7 +55,7 @@
 | `apps/web/src/scenes/fileOrbitLayout.ts` | new | Seeded lanes, item placement and tangent, label clearance push. Pure `three` math. | 1 |
 | `apps/web/src/scenes/fileOrbitLayout.test.ts` | new test | Seed determinism, lane spread, clearance. | 1 |
 | `apps/web/src/scenes/fileSystemOrbits.ts` | new | Item meshes (document or folder), labels, hit spheres, lane rings, hover, dim, focus, presence, pulse. | 2, 9 |
-| `apps/web/src/scenes/glowPlanet.ts` | new | Bergamot or obsidian planet with rim, halo, glow sprite; recolorable halo. | 3 |
+| `apps/web/src/scenes/glowPlanet.ts` | new | Ember or obsidian planet with rim, halo, glow sprite; recolorable halo. | 3 |
 | `apps/web/src/scenes/landingJourneyScene.ts` | new | Hero plus story: machine 01, picking, focus camera, station, machine 02, key, lock ring, rockets, story camera. | 3, 4, 5, 9 |
 | `apps/web/src/lib/useHeroFileFocus.ts` | new | Focus open, switch, close, Esc, scroll release, focus return, card follow. | 4, 5 |
 | `apps/web/src/components/FileFocusCard.tsx` | new | Side card: name, what it is, how it helps you, close, previous, next. | 5 |
@@ -608,7 +608,7 @@ Budget: about 170 production lines, 2 new production files, 1 edited file.
 **Interfaces:**
 - Consumes: `createFileSystemOrbits` (Task 2), `SYNCED_FILES` (Task 1), `ORBIT_PLANET_RADIUS` (Task 1), `celestialBodies.ts` helpers, `createSceneStage`, `loadLabelFont`.
 - Produces:
-  - `type PlanetTheme = "bergamot" | "obsidian"`; `type GlowPlanet = { group: THREE.Group; haloColor: THREE.Color; update: (elapsedSeconds: number, motionScale: number, haloBoost: number) => void }`; `createGlowPlanet(theme: PlanetTheme, disposables: Disposable[]): GlowPlanet`. Mutating `haloColor` recolors the halo and the glow sprite.
+  - `type PlanetTheme = "ember" | "obsidian"`; `type GlowPlanet = { group: THREE.Group; haloColor: THREE.Color; update: (elapsedSeconds: number, motionScale: number, haloBoost: number) => void }`; `createGlowPlanet(theme: PlanetTheme, disposables: Disposable[]): GlowPlanet`. Mutating `haloColor` recolors the halo and the glow sprite.
   - `type JourneyState = { intro: number }` (grows in Tasks 4 and 9); `type LandingJourneyScene = { state: JourneyState; dispose: () => void }`; `createLandingJourneyScene(host: HTMLElement, state: JourneyState): Promise<LandingJourneyScene | null>`.
 
 - [ ] **Step 1: Create the planet builder**
@@ -618,7 +618,7 @@ Create `apps/web/src/scenes/glowPlanet.ts`:
 ```ts
 import * as THREE from "three";
 import {
-  BERGAMOT_PLANET_PALETTE,
+  EMBER_PLANET_PALETTE,
   OBSIDIAN_PLANET_PALETTE,
   attachBandAdvection,
   createGlowMaterial,
@@ -629,7 +629,7 @@ import {
 import { ORBIT_PLANET_RADIUS } from "./fileOrbitLayout";
 import type { Disposable } from "./sceneStage";
 
-export type PlanetTheme = "bergamot" | "obsidian";
+export type PlanetTheme = "ember" | "obsidian";
 
 export type GlowPlanet = {
   group: THREE.Group;
@@ -647,7 +647,7 @@ type PlanetStyle = {
 };
 
 const PLANET_STYLES: Record<PlanetTheme, PlanetStyle> = {
-  bergamot: { palette: BERGAMOT_PLANET_PALETTE, seed: 3.1, halo: "#e87a2e", rim: "#ffd7af", emissive: 0.22, glowOpacity: 0.45 },
+  ember: { palette: EMBER_PLANET_PALETTE, seed: 3.1, halo: "#e87a2e", rim: "#ffd7af", emissive: 0.22, glowOpacity: 0.45 },
   obsidian: { palette: OBSIDIAN_PLANET_PALETTE, seed: 7.3, halo: "#06b6d4", rim: "#64dcff", emissive: 0.06, glowOpacity: 0.16 },
 };
 const HALO_STRENGTH = 0.75;
@@ -763,7 +763,7 @@ export async function createLandingJourneyScene(
   scene.add(keyLight, rimLight, createStarField(disposables, 1100, 30, 70));
 
   const machineOne = new THREE.Group();
-  const machineOnePlanet = createGlowPlanet("bergamot", disposables);
+  const machineOnePlanet = createGlowPlanet("ember", disposables);
   const machineOneOrbits = createFileSystemOrbits(SYNCED_FILES, ORBIT_SEED, disposables);
   machineOne.add(machineOnePlanet.group, machineOneOrbits.group);
   scene.add(machineOne);
@@ -848,7 +848,7 @@ Expected: both exit 0. `rg -n "planetOrbitScene" apps/web/src/pages/LandingPage.
 - [ ] **Step 5: Visual check (driven path)**
 
 Run `npm run dev:web`. Open `http://localhost:3000`. Take one screenshot of the hero.
-Expected: the bergamot planet sits inside the old `.hero-orbit` box with ten labelled items (`settings.json` through `commands/`) on four tilted dashed lanes, items moving both ways, labels not covering the planet disk. Layout around it is still the old two-column hero (Task 6 changes it). With DevTools "Emulate CSS prefers-reduced-motion: reduce", items do not move.
+Expected: the ember planet sits inside the old `.hero-orbit` box with ten labelled items (`settings.json` through `commands/`) on four tilted dashed lanes, items moving both ways, labels not covering the planet disk. Layout around it is still the old two-column hero (Task 6 changes it). With DevTools "Emulate CSS prefers-reduced-motion: reduce", items do not move.
 
 - [ ] **Step 6: Checkpoint (no commit)**
 
@@ -949,7 +949,7 @@ Replace the block from `const machineOne = new THREE.Group();` through the end o
 
 ```ts
   const machineOne = new THREE.Group();
-  const machineOnePlanet = createGlowPlanet("bergamot", disposables);
+  const machineOnePlanet = createGlowPlanet("ember", disposables);
   const machineOneOrbits = createFileSystemOrbits(SYNCED_FILES, ORBIT_SEED, disposables);
   const occluderGeometry = new THREE.SphereGeometry(ORBIT_PLANET_RADIUS, 24, 16);
   const occluderMaterial = new THREE.MeshBasicMaterial({ visible: false });
@@ -1442,7 +1442,7 @@ In `LandingPage.css`, insert directly before `@media (max-width: 900px) {`:
 
 .file-focus-title {
   margin: 0 0 var(--space-2);
-  color: var(--color-bergamota-light);
+  color: var(--color-embera-light);
   font-size: 15px;
 }
 
@@ -2520,7 +2520,7 @@ export async function createLandingJourneyScene(
   scene.add(keyLight, rimLight, createStarField(disposables, 1100, 30, 70));
 
   const machineOne = new THREE.Group();
-  const machineOnePlanet = createGlowPlanet("bergamot", disposables);
+  const machineOnePlanet = createGlowPlanet("ember", disposables);
   const machineOneOrbits = createFileSystemOrbits(SYNCED_FILES, ORBIT_SEED, disposables);
   const occluderGeometry = new THREE.SphereGeometry(ORBIT_PLANET_RADIUS, 24, 16);
   const occluderMaterial = new THREE.MeshBasicMaterial({ visible: false });
@@ -2734,7 +2734,7 @@ After the `.sync-story-step.is-active` block add:
 }
 
 .sync-story-step-button:focus-visible {
-  outline: 1px solid var(--color-bergamota);
+  outline: 1px solid var(--color-embera);
   outline-offset: 6px;
 }
 ```
@@ -3247,7 +3247,7 @@ Budget: about 90 added production lines (plus about 45 deleted), 1 new productio
 
 **Interfaces:**
 - Consumes: `createGlowPlanet` (Task 3), `createFileSystemOrbits` (Task 2), `SYNCED_FILES` (Task 1).
-- Produces: `type AuthOrbitState = { intro: number; expand: number }`; `type AuthOrbitScene = { state: AuthOrbitState; dispose: () => void }`; `createAuthOrbitScene(host: HTMLElement, state: AuthOrbitState): Promise<AuthOrbitScene | null>`. `expand` 0 to 1 scales the system up 20 percent, widens the orbits 25 percent, shifts the halo from cyan to bergamot, and pulses the halo once.
+- Produces: `type AuthOrbitState = { intro: number; expand: number }`; `type AuthOrbitScene = { state: AuthOrbitState; dispose: () => void }`; `createAuthOrbitScene(host: HTMLElement, state: AuthOrbitState): Promise<AuthOrbitScene | null>`. `expand` 0 to 1 scales the system up 20 percent, widens the orbits 25 percent, shifts the halo from cyan to ember, and pulses the halo once.
 
 - [ ] **Step 1: Create the scene**
 
@@ -3275,7 +3275,7 @@ export type AuthOrbitScene = {
 
 const ORBIT_SEED = 20261008;
 const CYAN_HALO = new THREE.Color("#06b6d4");
-const BERGAMOT_HALO = new THREE.Color("#e87a2e");
+const EMBER_HALO = new THREE.Color("#e87a2e");
 const CAMERA_POSITION = new THREE.Vector3(0, 1.2, 11);
 const CAMERA_LOOK = new THREE.Vector3(0, 0, 0);
 const easeOutCubic = gsap.parseEase("power3.out");
@@ -3308,7 +3308,7 @@ export async function createAuthOrbitScene(host: HTMLElement, state: AuthOrbitSt
     const expand = easeInOut(state.expand);
     orbitSystem.scale.setScalar((0.6 + 0.4 * intro) * (1 + 0.2 * expand));
     orbits.group.scale.setScalar(1 + 0.25 * expand);
-    planet.haloColor.copy(CYAN_HALO).lerp(BERGAMOT_HALO, expand);
+    planet.haloColor.copy(CYAN_HALO).lerp(EMBER_HALO, expand);
     planet.update(elapsedSeconds, motionScale, intro * (1 + 0.8 * Math.sin(Math.PI * state.expand)));
     orbits.update(deltaSeconds, motionScale, camera.position);
   });
@@ -3639,7 +3639,7 @@ Expected: tests pass (the auth unit tests in `lib/` are unchanged), build exit 0
 - [ ] **Step 5: Driven path against the local API**
 
 Start the API (`docker compose up --build`, API on `http://localhost:8100`, `VITE_API_URL=http://localhost:8100` in `.env`) and `npm run dev:web`.
-1. `/sign-up`: create an account. Expected: the form card fades, the planet panel moves to the center and grows, the halo pulses once and turns bergamot, then the panel shows "You're connected.", the recovery-key line, the warning, and "Continue in Cursor" with keyboard focus. No auto-redirect. Screenshot.
+1. `/sign-up`: create an account. Expected: the form card fades, the planet panel moves to the center and grows, the halo pulses once and turns ember, then the panel shows "You're connected.", the recovery-key line, the warning, and "Continue in Cursor" with keyboard focus. No auto-redirect. Screenshot.
 2. Click "Continue in Cursor": the URL becomes `/auth/continue` (plus the OAuth query when present).
 3. `/sign-in` with a wrong password: the form stays and shows the existing error. Screenshot.
 4. `/sign-in` with the right password: same expansion as step 1.

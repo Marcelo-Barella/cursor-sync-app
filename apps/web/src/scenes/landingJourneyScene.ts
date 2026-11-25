@@ -185,7 +185,7 @@ export async function createLandingJourneyScene(
   scene.add(keyLight, rimLight, createStarField(disposables, 1100, 30, 70));
 
   const machineOne = new THREE.Group();
-  const machineOnePlanet = createGlowPlanet("bergamot", disposables);
+  const machineOnePlanet = createGlowPlanet("ember", disposables);
   const machineOneOrbits = createFileSystemOrbits(SYNCED_FILES, ORBIT_SEED, disposables);
   const occluderGeometry = new THREE.SphereGeometry(ORBIT_PLANET_RADIUS, 24, 16);
   const occluderMaterial = new THREE.MeshBasicMaterial({ visible: false });

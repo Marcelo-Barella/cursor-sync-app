@@ -3,7 +3,7 @@ import type { Disposable } from "./sceneStage";
 
 export type PlanetPalette = readonly [string, string, string, string];
 
-export const BERGAMOT_PLANET_PALETTE: PlanetPalette = ["#682604", "#b85014", "#e87a2e", "#ffa366"];
+export const EMBER_PLANET_PALETTE: PlanetPalette = ["#682604", "#b85014", "#e87a2e", "#ffa366"];
 export const OBSIDIAN_PLANET_PALETTE: PlanetPalette = ["#040507", "#0a0b0d", "#151921", "#26303d"];
 
 const glowVertexShader = `
@@ -181,43 +181,43 @@ export function createGlowMaterial(
   });
 }
 
-const bergamotVertexPrelude = /* glsl */ `
+const emberVertexPrelude = /* glsl */ `
 uniform float uPlanetSeed;
 uniform float uPlanetRadius;
 uniform float uPlanetAmplitude;
-varying float vBergamotHeight;
-varying float vBergamotSlope;
-varying vec3 vBergamotNormal;
+varying float vEmberHeight;
+varying float vEmberSlope;
+varying vec3 vEmberNormal;
 
-float bergamotHash(vec3 cell) {
+float emberHash(vec3 cell) {
   cell = fract(cell * vec3(0.1031, 0.1030, 0.0973));
   cell += dot(cell, cell.yxz + 33.33);
   return fract((cell.x + cell.y) * cell.z);
 }
 
-float bergamotNoise(vec3 point) {
+float emberNoise(vec3 point) {
   vec3 cell = floor(point);
   vec3 blend = fract(point);
   blend = blend * blend * (3.0 - 2.0 * blend);
-  float x0 = mix(bergamotHash(cell), bergamotHash(cell + vec3(1.0, 0.0, 0.0)), blend.x);
-  float x1 = mix(bergamotHash(cell + vec3(0.0, 1.0, 0.0)), bergamotHash(cell + vec3(1.0, 1.0, 0.0)), blend.x);
-  float x2 = mix(bergamotHash(cell + vec3(0.0, 0.0, 1.0)), bergamotHash(cell + vec3(1.0, 0.0, 1.0)), blend.x);
-  float x3 = mix(bergamotHash(cell + vec3(0.0, 1.0, 1.0)), bergamotHash(cell + vec3(1.0, 1.0, 1.0)), blend.x);
+  float x0 = mix(emberHash(cell), emberHash(cell + vec3(1.0, 0.0, 0.0)), blend.x);
+  float x1 = mix(emberHash(cell + vec3(0.0, 1.0, 0.0)), emberHash(cell + vec3(1.0, 1.0, 0.0)), blend.x);
+  float x2 = mix(emberHash(cell + vec3(0.0, 0.0, 1.0)), emberHash(cell + vec3(1.0, 0.0, 1.0)), blend.x);
+  float x3 = mix(emberHash(cell + vec3(0.0, 1.0, 1.0)), emberHash(cell + vec3(1.0, 1.0, 1.0)), blend.x);
   return mix(mix(x0, x1, blend.y), mix(x2, x3, blend.y), blend.z);
 }
 
-float bergamotFbm(vec3 point) {
+float emberFbm(vec3 point) {
   float amplitude = 0.5;
   float total = 0.0;
   for (int octave = 0; octave < 4; octave += 1) {
-    total += bergamotNoise(point) * amplitude;
+    total += emberNoise(point) * amplitude;
     point = point * 2.03 + 1.7;
     amplitude *= 0.5;
   }
   return total;
 }
 
-float bergamotCrater(vec3 direction, vec3 center, float angularRadius, float depth) {
+float emberCrater(vec3 direction, vec3 center, float angularRadius, float depth) {
   float unit = acos(clamp(dot(normalize(direction), normalize(center)), -1.0, 1.0)) / angularRadius;
   float bowl = smoothstep(0.72, 0.08, unit);
   float rim = exp(-pow((unit - 0.8) * 9.0, 2.0));
@@ -225,31 +225,31 @@ float bergamotCrater(vec3 direction, vec3 center, float angularRadius, float dep
   return depth * (-bowl + rim * 0.55 + ejecta * 0.18);
 }
 
-float bergamotRelief(vec3 direction) {
+float emberRelief(vec3 direction) {
   vec3 radial = normalize(direction);
   float altitude = max(length(cameraPosition - modelMatrix[3].xyz) - uPlanetRadius, 0.0);
   float detail = 1.0 - smoothstep(24.0, 140.0, altitude);
   vec3 warp = vec3(
-    bergamotNoise(radial * 2.2 + uPlanetSeed),
-    bergamotNoise(radial * 2.2 + uPlanetSeed + 19.0),
-    bergamotNoise(radial * 2.2 + uPlanetSeed + 47.0)
+    emberNoise(radial * 2.2 + uPlanetSeed),
+    emberNoise(radial * 2.2 + uPlanetSeed + 19.0),
+    emberNoise(radial * 2.2 + uPlanetSeed + 47.0)
   ) - 0.5;
   vec3 warped = normalize(radial + (warp - radial * dot(warp, radial)) * 0.22);
-  float continental = bergamotFbm(warped * 2.4 + uPlanetSeed);
-  float highlands = bergamotFbm(warped * 5.6 + uPlanetSeed);
-  float ridges = 1.0 - abs(bergamotFbm(warped * 11.0 + uPlanetSeed) * 2.0 - 1.0);
+  float continental = emberFbm(warped * 2.4 + uPlanetSeed);
+  float highlands = emberFbm(warped * 5.6 + uPlanetSeed);
+  float ridges = 1.0 - abs(emberFbm(warped * 11.0 + uPlanetSeed) * 2.0 - 1.0);
   float height = (continental - 0.48) * 0.62;
   height += (highlands - 0.5) * 0.28 * detail;
   height += (ridges - 0.35) * 0.4 * detail;
-  height += bergamotCrater(warped, vec3(0.15, 0.78, 0.60), 0.055, 0.55) * detail;
-  height += bergamotCrater(warped, vec3(-0.62, 0.55, 0.56), 0.085, 0.70) * detail;
-  height += bergamotCrater(warped, vec3(0.48, 0.64, 0.42), 0.032, 0.40) * detail;
+  height += emberCrater(warped, vec3(0.15, 0.78, 0.60), 0.055, 0.55) * detail;
+  height += emberCrater(warped, vec3(-0.62, 0.55, 0.56), 0.085, 0.70) * detail;
+  height += emberCrater(warped, vec3(0.48, 0.64, 0.42), 0.032, 0.40) * detail;
   float pad = smoothstep(0.11, 0.045, length(radial - vec3(0.0, 1.0, 0.0)));
   return height * (1.0 - pad);
 }
 `;
 
-export function createBergamotGroundMaterial(planetRadius: number): THREE.MeshStandardMaterial {
+export function createEmberGroundMaterial(planetRadius: number): THREE.MeshStandardMaterial {
   const query = new URLSearchParams(window.location.search);
   const seedParam = query.get("planetSeed");
   const fieldParam = query.get("planetField");
@@ -263,7 +263,7 @@ export function createBergamotGroundMaterial(planetRadius: number): THREE.MeshSt
   const dust = new THREE.Color("#e87a2e");
   const rock = new THREE.Color("#4a2414");
   const material = new THREE.MeshStandardMaterial({ color: "#ffffff", roughness: 0.84, metalness: 0.02 });
-  material.customProgramCacheKey = () => "bergamot-ground";
+  material.customProgramCacheKey = () => "ember-ground";
   material.onBeforeCompile = (shader) => {
     shader.uniforms.uPlanetSeed = { value: seed };
     shader.uniforms.uPlanetRadius = { value: planetRadius };
@@ -273,27 +273,27 @@ export function createBergamotGroundMaterial(planetRadius: number): THREE.MeshSt
     shader.uniforms.uPlainColor = { value: plain };
     shader.uniforms.uDustColor = { value: dust };
     shader.uniforms.uRockColor = { value: rock };
-    shader.vertexShader = bergamotVertexPrelude + shader.vertexShader;
+    shader.vertexShader = emberVertexPrelude + shader.vertexShader;
     shader.vertexShader = shader.vertexShader.replace(
       "#include <beginnormal_vertex>",
       `
-      vec3 bergamotRadial = normalize(position);
-      float bergamotHeight = bergamotRelief(bergamotRadial);
-      vec3 bergamotTangent = normalize(cross(bergamotRadial, abs(bergamotRadial.y) > 0.96 ? vec3(1.0, 0.0, 0.0) : vec3(0.0, 1.0, 0.0)));
-      vec3 bergamotBitangent = cross(bergamotRadial, bergamotTangent);
-      float bergamotStep = 0.012;
-      float bergamotRight = bergamotRelief(normalize(bergamotRadial + bergamotTangent * bergamotStep));
-      float bergamotForward = bergamotRelief(normalize(bergamotRadial + bergamotBitangent * bergamotStep));
-      vec3 bergamotPoint = bergamotRadial * (uPlanetRadius + bergamotHeight * uPlanetAmplitude);
-      vec3 bergamotPointRight = normalize(bergamotRadial + bergamotTangent * bergamotStep) * (uPlanetRadius + bergamotRight * uPlanetAmplitude);
-      vec3 bergamotPointForward = normalize(bergamotRadial + bergamotBitangent * bergamotStep) * (uPlanetRadius + bergamotForward * uPlanetAmplitude);
-      vec3 objectNormal = normalize(cross(bergamotPointRight - bergamotPoint, bergamotPointForward - bergamotPoint));
-      vBergamotHeight = bergamotHeight;
-      vBergamotSlope = 1.0 - abs(dot(normalize(objectNormal), bergamotRadial));
-      vBergamotNormal = normalize(objectNormal);
+      vec3 emberRadial = normalize(position);
+      float emberHeight = emberRelief(emberRadial);
+      vec3 emberTangent = normalize(cross(emberRadial, abs(emberRadial.y) > 0.96 ? vec3(1.0, 0.0, 0.0) : vec3(0.0, 1.0, 0.0)));
+      vec3 emberBitangent = cross(emberRadial, emberTangent);
+      float emberStep = 0.012;
+      float emberRight = emberRelief(normalize(emberRadial + emberTangent * emberStep));
+      float emberForward = emberRelief(normalize(emberRadial + emberBitangent * emberStep));
+      vec3 emberPoint = emberRadial * (uPlanetRadius + emberHeight * uPlanetAmplitude);
+      vec3 emberPointRight = normalize(emberRadial + emberTangent * emberStep) * (uPlanetRadius + emberRight * uPlanetAmplitude);
+      vec3 emberPointForward = normalize(emberRadial + emberBitangent * emberStep) * (uPlanetRadius + emberForward * uPlanetAmplitude);
+      vec3 objectNormal = normalize(cross(emberPointRight - emberPoint, emberPointForward - emberPoint));
+      vEmberHeight = emberHeight;
+      vEmberSlope = 1.0 - abs(dot(normalize(objectNormal), emberRadial));
+      vEmberNormal = normalize(objectNormal);
       `,
     );
-    shader.vertexShader = shader.vertexShader.replace("#include <begin_vertex>", "vec3 transformed = bergamotPoint;");
+    shader.vertexShader = shader.vertexShader.replace("#include <begin_vertex>", "vec3 transformed = emberPoint;");
     shader.fragmentShader =
       `
       uniform float uPlanetField;
@@ -301,27 +301,27 @@ export function createBergamotGroundMaterial(planetRadius: number): THREE.MeshSt
       uniform vec3 uPlainColor;
       uniform vec3 uDustColor;
       uniform vec3 uRockColor;
-      varying float vBergamotHeight;
-      varying float vBergamotSlope;
-      varying vec3 vBergamotNormal;
+      varying float vEmberHeight;
+      varying float vEmberSlope;
+      varying vec3 vEmberNormal;
       ` + shader.fragmentShader;
     shader.fragmentShader = shader.fragmentShader.replace(
       "#include <color_fragment>",
       `
       #include <color_fragment>
-      float bergamotShade = clamp(vBergamotHeight * 0.85 + 0.45, 0.0, 1.0);
-      vec3 bergamotAlbedo = mix(uBasinColor, uPlainColor, smoothstep(0.18, 0.48, bergamotShade));
-      bergamotAlbedo = mix(bergamotAlbedo, uDustColor, smoothstep(0.5, 0.82, bergamotShade));
-      bergamotAlbedo = mix(bergamotAlbedo, uRockColor, clamp(vBergamotSlope * 1.6, 0.0, 1.0));
-      diffuseColor.rgb *= bergamotAlbedo;
+      float emberShade = clamp(vEmberHeight * 0.85 + 0.45, 0.0, 1.0);
+      vec3 emberAlbedo = mix(uBasinColor, uPlainColor, smoothstep(0.18, 0.48, emberShade));
+      emberAlbedo = mix(emberAlbedo, uDustColor, smoothstep(0.5, 0.82, emberShade));
+      emberAlbedo = mix(emberAlbedo, uRockColor, clamp(vEmberSlope * 1.6, 0.0, 1.0));
+      diffuseColor.rgb *= emberAlbedo;
       `,
     );
     shader.fragmentShader = shader.fragmentShader.replace(
       "#include <roughnessmap_fragment>",
       `
       #include <roughnessmap_fragment>
-      roughnessFactor = mix(0.94, 0.62, clamp(vBergamotHeight * 0.5 + 0.5, 0.0, 1.0));
-      roughnessFactor = mix(roughnessFactor, 0.84, clamp(vBergamotSlope, 0.0, 1.0));
+      roughnessFactor = mix(0.94, 0.62, clamp(vEmberHeight * 0.5 + 0.5, 0.0, 1.0));
+      roughnessFactor = mix(roughnessFactor, 0.84, clamp(vEmberSlope, 0.0, 1.0));
       `,
     );
     shader.fragmentShader = shader.fragmentShader.replace(
@@ -329,9 +329,9 @@ export function createBergamotGroundMaterial(planetRadius: number): THREE.MeshSt
       `
       #include <opaque_fragment>
       if (uPlanetField > 0.5) {
-        vec3 fieldColor = vec3(clamp(vBergamotHeight * 0.5 + 0.5, 0.0, 1.0));
-        if (uPlanetField >= 1.5 && uPlanetField < 2.5) fieldColor = vec3(clamp(vBergamotSlope, 0.0, 1.0));
-        if (uPlanetField >= 2.5 && uPlanetField < 3.5) fieldColor = vBergamotNormal * 0.5 + 0.5;
+        vec3 fieldColor = vec3(clamp(vEmberHeight * 0.5 + 0.5, 0.0, 1.0));
+        if (uPlanetField >= 1.5 && uPlanetField < 2.5) fieldColor = vec3(clamp(vEmberSlope, 0.0, 1.0));
+        if (uPlanetField >= 2.5 && uPlanetField < 3.5) fieldColor = vEmberNormal * 0.5 + 0.5;
         if (uPlanetField >= 3.5) fieldColor = diffuseColor.rgb;
         gl_FragColor.rgb = fieldColor;
       }

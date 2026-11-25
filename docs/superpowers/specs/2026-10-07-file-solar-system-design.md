@@ -54,7 +54,7 @@ All scene modules follow `.cursor/rules/threejs-scenes.mdc`: plain TS, `create<N
 | File | Status | Job |
 | --- | --- | --- |
 | `scenes/fileSystemOrbits.ts` | new | Builds the ten items on about four tilted orbit planes with mixed direction and speed, seeded. Owns item meshes (document card or folder tab), labels, hit spheres, hover glow, dimming, and `focus(id) / release()` targets. Exposes `update(deltaSeconds, motionScale)`, `pickables`, `itemWorldPosition(id)`. |
-| `scenes/landingJourneyScene.ts` | new | Hero plus story in one scene: bergamot planet (machine 01), cloud station, obsidian planet (machine 02), camera shots, focus fly-to, raycast picking. Reads a `JourneyState` by reference. |
+| `scenes/landingJourneyScene.ts` | new | Hero plus story in one scene: ember planet (machine 01), cloud station, obsidian planet (machine 02), camera shots, focus fly-to, raycast picking. Reads a `JourneyState` by reference. |
 | `scenes/syncRockets.ts` | new | Pool of ten small rockets (lathe body, nose, three fins), file-name label sprites, analytic arc paths for leg 1 (machine 01 to station) and leg 2 (station to machine 02), fading trail, exhaust sprite. |
 | `components/FileFocusCard.tsx` | new | The side card in the hero focus mode: name, what it is, how it helps you, close, previous, next. Styles live in `LandingPage.css`. |
 | `components/HowItSyncsSection.tsx` | edit | Becomes the story overlay inside the journey stage: title, clickable steps 01 to 04, rail, play/pause, note. |
@@ -144,7 +144,7 @@ Authored shots per step, blended by story progress: 01 and 02 frame machine 01, 
 - Success in `AuthForm` (sign in and sign up):
   1. Save the token as today. Set view to `connected`.
   2. `AuthLayout` runs GSAP `Flip`: the visual panel grows from the left column to the center; the form card fades out.
-  3. Scene `expand` tween from 0 to 1: the planet scales up and centers; orbits widen; one halo pulse shifts from cyan to bergamot orange.
+  3. Scene `expand` tween from 0 to 1: the planet scales up and centers; orbits widen; one halo pulse shifts from cyan to ember orange.
   4. Success panel fades in over the planet:
      - Title: "You're connected."
      - Body: "Your recovery key appears once, in the Cursor Sync extension, right after you continue."
