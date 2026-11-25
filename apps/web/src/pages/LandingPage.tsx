@@ -232,7 +232,7 @@ export function LandingPage() {
           <h2 id="maker-name" className="maker-name">
             Marcelo Barella
           </h2>
-          <p className="mono maker-role">A young SpaceXAI Ambassador.</p>
+          <p className="mono maker-role">Build Ambassador, part of the SpaceXSI Community.</p>
           <p className="maker-bio">
             He builds Cursor Sync so a setup can travel without handing the keys to the server. Everything is
             client-side encrypted before bytes leave your device.
