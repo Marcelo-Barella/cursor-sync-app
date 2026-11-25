@@ -1,8 +1,12 @@
 import { Link } from "react-router-dom";
+import { useAuthOptional } from "../lib/authStore";
 import { getPublicSiteHost } from "../lib/site";
 import "./SiteFooter.css";
 
 export function SiteFooter() {
+  const auth = useAuthOptional();
+  const signedIn = Boolean(auth?.token);
+
   return (
     <footer className="site-footer">
       <div className="site-footer-inner">
@@ -15,7 +19,7 @@ export function SiteFooter() {
         </div>
         <nav className="site-footer-links" aria-label="Footer">
           <Link to="/changelog">Changelog</Link>
-          <Link to="/sign-in">Sign in</Link>
+          {signedIn ? <Link to="/app">App</Link> : <Link to="/sign-in">Sign in</Link>}
           {import.meta.env.DEV ? <Link to="/developer">Developer</Link> : null}
         </nav>
       </div>

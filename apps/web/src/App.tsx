@@ -1,4 +1,5 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { AuthCrossTabBridge } from "./components/AuthCrossTabBridge";
 import { RequireAuth } from "./components/RequireAuth";
 import { ChangelogPage } from "./pages/ChangelogPage";
 import { LandingPage } from "./pages/LandingPage";
@@ -15,6 +16,7 @@ import { SyncTab } from "./pages/app/SyncTab";
 export function App() {
   return (
     <BrowserRouter>
+      <AuthCrossTabBridge />
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/changelog" element={<ChangelogPage />} />
