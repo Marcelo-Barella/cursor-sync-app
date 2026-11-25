@@ -21,15 +21,21 @@ export function syncMemorySessionFromStorage(): void {
 }
 
 export function setMemorySession(token: string, email: string | null): void {
+  const changed = memoryToken !== token || memoryEmail !== email;
   memoryToken = token;
   memoryEmail = email;
-  notifyAuthStateChanged();
+  if (changed) {
+    notifyAuthStateChanged();
+  }
 }
 
 export function clearMemorySession(): void {
+  const hadSession = memoryToken !== null || memoryEmail !== null;
   memoryToken = null;
   memoryEmail = null;
-  notifyAuthStateChanged();
+  if (hadSession) {
+    notifyAuthStateChanged();
+  }
 }
 
 export function notifyAuthStateChanged(): void {
