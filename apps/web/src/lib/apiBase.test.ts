@@ -5,6 +5,7 @@ import {
   normalizeApiBaseUrl,
   parseStrictProductionApiOrigin,
   resolveApiBaseUrl,
+  resolveBuildTimeOnlyApiBaseUrl,
   setStoredApiOverride,
   isAllowedDevApiOrigin,
 } from "./apiBase";
@@ -135,6 +136,17 @@ describe("resolveApiBaseUrl", () => {
         mode: "development",
       })
     ).toBe("http://localhost:9999");
+  });
+
+  it("resolveBuildTimeOnlyApiBaseUrl ignores localStorage and query overrides", () => {
+    const storage = createMemoryStorage();
+    storage.setItem(API_BASE_STORAGE_KEY, "https://stored.example.com");
+    expect(
+      resolveBuildTimeOnlyApiBaseUrl({
+        buildTimeUrl: "https://build.example.com",
+        mode: "staging",
+      })
+    ).toBe("https://build.example.com");
   });
 
   it("rejects dev storage override for non-allowlisted hosts", () => {

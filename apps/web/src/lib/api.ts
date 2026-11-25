@@ -9,7 +9,11 @@ export type AuthError = {
   error: string;
 };
 
-import { getApiBaseUrlForAuth, isAuthApiBaseMissing } from "./apiBase";
+import {
+  getApiBaseUrlForAuth,
+  getBuildTimeOnlyApiBaseUrlForAuth,
+  isAuthApiBaseMissing,
+} from "./apiBase";
 import {
   AuthApiError,
   messageForAuthErrorCategory,
@@ -28,6 +32,17 @@ function requireApiBaseUrl(): string {
     );
   }
   const base = getApiBaseUrlForAuth();
+  if (!base) {
+    throw new AuthApiError(
+      "empty_api_base",
+      messageForAuthErrorCategory("empty_api_base")
+    );
+  }
+  return base;
+}
+
+function requireBuildTimeOnlyApiBaseUrl(): string {
+  const base = getBuildTimeOnlyApiBaseUrlForAuth();
   if (!base) {
     throw new AuthApiError(
       "empty_api_base",
@@ -231,7 +246,7 @@ export async function resendVerificationEmail(
 }
 
 export async function getMe(token: string): Promise<MeResponse> {
-  const base = requireApiBaseUrl();
+  const base = requireBuildTimeOnlyApiBaseUrl();
   const response = await fetch(`${base}/auth/me`, {
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -274,4 +289,41 @@ export async function getExtensionChangelog(): Promise<ExtensionChangelog> {
     signal: AbortSignal.timeout(CHANGELOG_FETCH_TIMEOUT_MS),
   });
   return parseJson<ExtensionChangelog>(response);
+}
+
+const LOGOUT_PATHS = ["/auth/logout", "/auth/session-revoke"] as const;
+const LOGOUT_TIMEOUT_MS = 2_000;
+
+export async function requestServerLogout(token: string | null): Promise<void> {
+  if (!token) {
+    return;
+  }
+  let base: string | null = null;
+  try {
+    base = requireApiBaseUrl();
+  } catch {
+    return;
+  }
+
+  for (const path of LOGOUT_PATHS) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), LOGOUT_TIMEOUT_MS);
+    try {
+      const response = await fetch(`${base}${path}`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        signal: controller.signal,
+      });
+      if (response.ok || response.status === 404) {
+        return;
+      }
+    } catch {
+      // Local logout must not depend on server revoke.
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
 }
