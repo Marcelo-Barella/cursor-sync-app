@@ -14,10 +14,18 @@ import { telemetryRoutes } from "./routes/telemetry.js";
 export function createApp() {
   const app = new Hono();
 
+  app.use("*", async (c, next) => {
+    const origin = c.req.header("origin");
+    if (c.req.method === "OPTIONS" && origin && !resolveCorsOrigin(origin)) {
+      return c.body(null, 403);
+    }
+    await next();
+  });
+
   app.use(
     "*",
     cors({
-      origin: (origin) => resolveCorsOrigin(origin),
+      origin: (origin) => resolveCorsOrigin(origin || undefined),
       allowMethods: ["GET", "POST", "PUT", "OPTIONS"],
       allowHeaders: ["Content-Type", "Authorization"],
     })

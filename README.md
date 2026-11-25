@@ -36,6 +36,7 @@ db/
 ```bash
 cp .env.example .env
 # Set JWT_SECRET in .env to a long random string (required — API refuses to start without it)
+# .env.example sets CORS_ALLOWED_ORIGINS=http://localhost:3000 for the local website → API cross-origin API calls
 
 docker compose up --build
 ```
@@ -43,12 +44,14 @@ docker compose up --build
 - Website: **http://localhost:3000**
 - API: **http://localhost:8100**
 
+On deployed hosts, set `CORS_ALLOWED_ORIGINS` to your public `https://` website origin (not localhost).
+
 ### Website only (Vite dev server)
 
 With the API running (compose or `npm run dev:api`):
 
 ```bash
-cp .env.example .env   # includes VITE_API_URL=http://localhost:8100 for the website
+cp .env.example .env   # VITE_API_URL=http://localhost:8100 and CORS_ALLOWED_ORIGINS=http://localhost:3000
 npm install
 npm run dev:web
 ```
@@ -152,9 +155,11 @@ See `.env.example`:
 | `JWT_SECRET` | Required. Secret for signing session JWTs; must not be missing or a known placeholder |
 | `PORT` | API port (default `8100`) |
 | `PUBLIC_WEB_ORIGIN` / `WEB_ORIGIN` | Public website origin for verification links (required in deployed environments; no trailing slash required) |
-| `CORS_ALLOWED_ORIGINS` | Comma-separated browser origins (e.g. `https://staging.cursor-sync.com`). When unset, the API reflects the request `Origin` header (or `*` when absent). |
+| `CORS_ALLOWED_ORIGINS` | Comma-separated browser origins (e.g. `https://staging.cursor-sync.com`). When unset or empty, cross-origin browser requests get no `Access-Control-Allow-Origin` (fail closed); same-origin and no-`Origin` clients (curl, server-side) are unchanged. |
 | `CORS_ALLOWED_ORIGIN_PATTERNS` | Optional comma-separated `https` origin suffix patterns (e.g. Vercel previews). Applies only when `CORS_ALLOWED_ORIGINS` is set. |
 | `RESEND_FROM_EMAIL` / `RESEND_FROM_NAME` | Verification email sender (e.g. `noreply@cursor-sync.com`, `Cursor Sync`). Required with `RESEND_API_KEY` to send mail. |
+| `GA4_MEASUREMENT_ID` / `GA4_API_SECRET` | GA4 Measurement Protocol for `POST /v1/telemetry`; both required to forward events (unset yields 204 drop). |
+| `TELEMETRY_EVENT_ALLOWLIST` | Optional comma-separated telemetry event names (in-code defaults when unset). |
 | `VITE_API_URL` | Website: HTTPS API origin baked into production/staging builds (origin only; required for auth). Local dev defaults to `http://localhost:8100` when unset. See `apps/web/docs/SECURITY_HEADERS.md`. |
 | `VITE_DEV_API_ALLOWLIST` | Optional comma-separated API origins allowed for dev-only overrides (`?api=` / Developer page). |
 
