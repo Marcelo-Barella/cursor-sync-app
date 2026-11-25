@@ -1,13 +1,16 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   API_BASE_STORAGE_KEY,
   defaultApiBaseForMode,
   normalizeApiBaseUrl,
-  readQueryApiOverride,
   resolveApiBaseUrl,
-  setStoredApiOverride,
 } from "./apiBase";
 import { DEFAULT_LOCAL_API_BASE_URL } from "./defaults";
+import {
+  bootstrapApiBaseFromLocation,
+  purgeStoredApiOverrides,
+  stripApiQueryParamFromLocation,
+} from "./apiBaseSecurity";
 
 function createMemoryStorage(): Storage {
   const map = new Map<string, string>();
@@ -58,7 +61,6 @@ describe("resolveApiBaseUrl", () => {
     const storage = createMemoryStorage();
     const url = resolveApiBaseUrl({
       storage,
-      search: "",
       buildTimeUrl: "",
       mode: "production",
     });
@@ -70,7 +72,6 @@ describe("resolveApiBaseUrl", () => {
     const storage = createMemoryStorage();
     const url = resolveApiBaseUrl({
       storage,
-      search: "",
       buildTimeUrl: "",
       mode: "staging",
     });
@@ -89,7 +90,6 @@ describe("resolveApiBaseUrl", () => {
     for (const mode of ["production", "staging"] as const) {
       const url = resolveApiBaseUrl({
         storage,
-        search: "",
         buildTimeUrl: "",
         mode,
       });
@@ -102,87 +102,78 @@ describe("resolveApiBaseUrl", () => {
     expect(
       resolveApiBaseUrl({
         storage,
-        search: "",
         buildTimeUrl: "http://localhost:8100/",
       })
     ).toBe("http://localhost:8100");
   });
 
-  it("prefers localStorage override over build-time URL", () => {
+  it("ignores stored poisoned override and uses build-time URL", () => {
     const storage = createMemoryStorage();
-    storage.setItem(API_BASE_STORAGE_KEY, "https://stored.example.com");
+    storage.setItem(API_BASE_STORAGE_KEY, "https://attacker.example");
     expect(
       resolveApiBaseUrl({
         storage,
-        search: "",
-        buildTimeUrl: "http://localhost:8100",
+        buildTimeUrl: "https://api.sync.example.com",
+        mode: "production",
       })
-    ).toBe("https://stored.example.com");
-  });
-
-  it("saves a valid ?api= override to storage and uses it", () => {
-    const storage = createMemoryStorage();
-    expect(
-      resolveApiBaseUrl({
-        storage,
-        search: "?api=http://localhost:9999/",
-        buildTimeUrl: "http://localhost:8100",
-      })
-    ).toBe("http://localhost:9999");
-    expect(storage.getItem(API_BASE_STORAGE_KEY)).toBe("http://localhost:9999");
-  });
-
-  it("prefers ?api= over stored override for the current resolution", () => {
-    const storage = createMemoryStorage();
-    storage.setItem(API_BASE_STORAGE_KEY, "https://stored.example.com");
-    expect(
-      resolveApiBaseUrl({
-        storage,
-        search: "?api=http://localhost:7777",
-      })
-    ).toBe("http://localhost:7777");
-  });
-
-  it("clears storage when ?api=clear is present and falls back", () => {
-    const storage = createMemoryStorage();
-    storage.setItem(API_BASE_STORAGE_KEY, "https://stored.example.com");
-    expect(
-      resolveApiBaseUrl({
-        storage,
-        search: "?api=clear",
-        buildTimeUrl: "http://localhost:8100",
-        mode: "development",
-      })
-    ).toBe("http://localhost:8100");
-    expect(storage.getItem(API_BASE_STORAGE_KEY)).toBeNull();
-  });
-
-  it("ignores invalid ?api= values and keeps lower-precedence sources", () => {
-    const storage = createMemoryStorage();
-    storage.setItem(API_BASE_STORAGE_KEY, "https://stored.example.com");
-    expect(
-      resolveApiBaseUrl({
-        storage,
-        search: "?api=not-valid",
-        buildTimeUrl: "http://localhost:8100",
-      })
-    ).toBe("https://stored.example.com");
-    expect(storage.getItem(API_BASE_STORAGE_KEY)).toBe("https://stored.example.com");
-  });
-
-  it("setStoredApiOverride clears invalid stored values on write", () => {
-    const storage = createMemoryStorage();
-    setStoredApiOverride("https://override.example.com/", storage);
-    expect(storage.getItem(API_BASE_STORAGE_KEY)).toBe(
-      "https://override.example.com"
-    );
-    setStoredApiOverride(null, storage);
-    expect(storage.getItem(API_BASE_STORAGE_KEY)).toBeNull();
+    ).toBe("https://api.sync.example.com");
   });
 });
 
-describe("readQueryApiOverride", () => {
-  it("treats empty api param as clear", () => {
-    expect(readQueryApiOverride("?api=")).toEqual({ action: "clear" });
+describe("apiBaseSecurity bootstrap", () => {
+  it("purges stored API override keys", () => {
+    const storage = createMemoryStorage();
+    storage.setItem(API_BASE_STORAGE_KEY, "https://attacker.example");
+    purgeStoredApiOverrides(storage);
+    expect(storage.getItem(API_BASE_STORAGE_KEY)).toBeNull();
+  });
+
+  it("strips api from the URL and keeps other params and the hash", () => {
+    const replaceState = vi.fn();
+    vi.stubGlobal("window", {
+      location: {
+        pathname: "/auth/continue",
+        search: "?api=https://evil.example&state=1",
+        hash: "#panel",
+      },
+      history: { replaceState },
+    } as unknown as Window);
+    stripApiQueryParamFromLocation();
+    expect(replaceState).toHaveBeenCalledWith(
+      null,
+      "",
+      "/auth/continue?state=1#panel"
+    );
+    vi.unstubAllGlobals();
+  });
+
+  it("on startup ignores ?api= after purging poisoned storage", () => {
+    const storage = createMemoryStorage();
+    storage.setItem(API_BASE_STORAGE_KEY, "https://attacker.example");
+    const replaceState = vi.fn();
+    vi.stubGlobal("localStorage", storage);
+    vi.stubGlobal("window", {
+      location: {
+        pathname: "/sign-in",
+        search: "?api=https://evil.example&redirect_uri=x",
+        hash: "",
+      },
+      history: { replaceState },
+    } as unknown as Window);
+    bootstrapApiBaseFromLocation();
+    expect(storage.getItem(API_BASE_STORAGE_KEY)).toBeNull();
+    expect(replaceState).toHaveBeenCalledWith(
+      null,
+      "",
+      "/sign-in?redirect_uri=x"
+    );
+    expect(
+      resolveApiBaseUrl({
+        storage,
+        buildTimeUrl: "https://api.production.example",
+        mode: "production",
+      })
+    ).toBe("https://api.production.example");
+    vi.unstubAllGlobals();
   });
 });

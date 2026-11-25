@@ -1,49 +1,15 @@
-import { FormEvent, useState } from "react";
 import { Link } from "react-router-dom";
-import { Button } from "../components/Button";
-import { Input } from "../components/Input";
 import { Mark } from "../components/Mark";
 import { SiteFooter } from "../components/SiteFooter";
 import {
-  LOCAL_API_PRESET,
-  getStoredApiOverride,
   isBuildTimeApiBaseConfigured,
-  normalizeApiBaseUrl,
   readBuildTimeApiUrl,
-  resolveApiBaseUrl,
-  setStoredApiOverride,
 } from "../lib/apiBase";
 import { useApiBaseUrl } from "../lib/useApiBaseUrl";
 import "./DeveloperPage.css";
 
 export function DeveloperPage() {
   const apiBase = useApiBaseUrl();
-  const [draft, setDraft] = useState(() => getStoredApiOverride() ?? "");
-  const [message, setMessage] = useState<string | null>(null);
-
-  function applyOverride(url: string | null) {
-    setStoredApiOverride(url);
-    setDraft(url ?? "");
-    setMessage(url ? "Override saved." : "Override cleared.");
-  }
-
-  function onSubmit(event: FormEvent) {
-    event.preventDefault();
-    const normalized = normalizeApiBaseUrl(draft);
-    if (!normalized) {
-      setMessage("Enter a valid http or https URL.");
-      return;
-    }
-    applyOverride(normalized);
-  }
-
-  const effectiveWithoutOverride = resolveApiBaseUrl({
-    storage: {
-      getItem: () => null,
-      setItem: () => undefined,
-      removeItem: () => undefined,
-    },
-  });
   const buildTimeApiUrl = readBuildTimeApiUrl();
   const buildTimeConfigured = isBuildTimeApiBaseConfigured();
 
@@ -62,18 +28,15 @@ export function DeveloperPage() {
         <div className="developer-panel">
           <h1 className="developer-title">Developer</h1>
           <p className="developer-lead">
-            Configure which API host this site calls. Overrides are stored in this
-            browser only.
+            API host used by this site. The target comes from build-time
+            configuration or the default for the current mode; browser overrides
+            are not supported.
           </p>
 
           <dl className="developer-meta">
             <div className="developer-meta-row">
               <dt>Active API target</dt>
               <dd className="developer-mono">{apiBase}</dd>
-            </div>
-            <div className="developer-meta-row">
-              <dt>Without override</dt>
-              <dd className="developer-mono">{effectiveWithoutOverride}</dd>
             </div>
             <div className="developer-meta-row">
               <dt>Build-time API URL (VITE_API_URL)</dt>
@@ -83,43 +46,12 @@ export function DeveloperPage() {
             </div>
           </dl>
 
-          <form className="developer-form" onSubmit={onSubmit}>
-            <Input
-              label="API base URL override"
-              name="apiBase"
-              type="url"
-              inputMode="url"
-              autoComplete="off"
-              spellCheck={false}
-              placeholder="https://api.example.com"
-              value={draft}
-              onChange={(event) => setDraft(event.target.value)}
-            />
-            <div className="developer-actions">
-              <Button type="submit" variant="secondary">
-                Save override
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => applyOverride(LOCAL_API_PRESET)}
-              >
-                Local
-              </Button>
-              <Button type="button" variant="ghost" onClick={() => applyOverride(null)}>
-                Clear override
-              </Button>
-            </div>
-          </form>
-
-          {message ? <p className="developer-message">{message}</p> : null}
-
           <p className="developer-hint">
-            You can also set{" "}
-            <code className="developer-inline-code">?api=&lt;url&gt;</code> in the
-            address bar; a valid value is saved here automatically. Use{" "}
-            <code className="developer-inline-code">?api=clear</code> to remove the
-            stored override.
+            When{" "}
+            <code className="developer-inline-code">VITE_API_URL</code> is set at
+            build time, all modes use that URL. In development without a build-time
+            URL, the default local API preset is used. Browser-stored overrides are
+            not applied.
           </p>
         </div>
       </main>
