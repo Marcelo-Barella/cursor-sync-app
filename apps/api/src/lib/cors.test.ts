@@ -68,16 +68,39 @@ test("normalizes trailing slashes in allowlist entries", () => {
   }
 });
 
-test("origin comparison is case- and port-exact", () => {
-  process.env.CORS_ALLOWED_ORIGINS = "https://staging.cursor-sync.com";
+test("canonicalizes mixed-case and default port in allowlist for browser Origin", () => {
+  const parsed = parseCorsAllowlistEntry("https://Staging.cursor-sync.com:443");
+  assert.equal(parsed.ok, true);
+  if (parsed.ok) {
+    assert.equal(parsed.origin, "https://staging.cursor-sync.com");
+  }
+
+  process.env.CORS_ALLOWED_ORIGINS = "https://Staging.cursor-sync.com:443";
   delete process.env.CORS_ALLOWED_ORIGIN_PATTERNS;
   assert.equal(
-    resolveCorsOrigin("https://STAGING.cursor-sync.com"),
-    null
+    resolveCorsOrigin("https://staging.cursor-sync.com"),
+    "https://staging.cursor-sync.com"
   );
+});
+
+test("rejects allowlist entry with a path", () => {
+  const parsed = parseCorsAllowlistEntry("https://staging.cursor-sync.com/app");
+  assert.equal(parsed.ok, false);
+  if (!parsed.ok) {
+    assert.match(parsed.reason, /path/i);
+  }
+});
+
+test("port must match and unparseable Origin is rejected", () => {
   process.env.CORS_ALLOWED_ORIGINS = "http://localhost:3000";
+  delete process.env.CORS_ALLOWED_ORIGIN_PATTERNS;
   assert.equal(resolveCorsOrigin("http://localhost:3001"), null);
   assert.equal(resolveCorsOrigin("http://localhost:3000"), "http://localhost:3000");
+  assert.equal(resolveCorsOrigin("not-an-origin"), null);
+  assert.equal(
+    resolveCorsOrigin("https://staging.cursor-sync.com/path"),
+    null
+  );
 });
 
 test("findInsecureHttpCorsOriginsInProduction leaves only loopback http origins", () => {

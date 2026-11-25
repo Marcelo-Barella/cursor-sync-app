@@ -15,6 +15,39 @@ function isLoopbackHost(hostname: string): boolean {
   return /^127(?:\.\d{1,3}){3}$/.test(hostname);
 }
 
+function parseOriginLike(value: string): URL | null {
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.includes("*")) {
+    return null;
+  }
+
+  let url: URL;
+  try {
+    url = new URL(trimmed);
+  } catch {
+    return null;
+  }
+
+  if (url.username || url.password || url.search || url.hash) {
+    return null;
+  }
+
+  const path = url.pathname;
+  if (path !== "" && path !== "/") {
+    return null;
+  }
+
+  if (url.protocol === "https:") {
+    return url;
+  }
+
+  if (url.protocol === "http:" && isLoopbackHost(url.hostname)) {
+    return url;
+  }
+
+  return null;
+}
+
 export function parseCorsAllowlistEntry(entry: string): CorsAllowlistParseResult {
   const trimmed = entry.trim();
   if (!trimmed) {
@@ -24,11 +57,9 @@ export function parseCorsAllowlistEntry(entry: string): CorsAllowlistParseResult
     return { ok: false, reason: "wildcards are not allowed" };
   }
 
-  const withoutTrailingSlash = trimmed.replace(/\/+$/, "");
-
   let url: URL;
   try {
-    url = new URL(withoutTrailingSlash);
+    url = new URL(trimmed);
   } catch {
     return { ok: false, reason: "invalid origin URL" };
   }
@@ -37,17 +68,16 @@ export function parseCorsAllowlistEntry(entry: string): CorsAllowlistParseResult
     return { ok: false, reason: "origin must not include userinfo, query, or fragment" };
   }
 
-  const path = url.pathname;
-  if (path !== "" && path !== "/") {
+  if (url.pathname !== "" && url.pathname !== "/") {
     return { ok: false, reason: "origin must not include a path" };
   }
 
   if (url.protocol === "https:") {
-    return { ok: true, origin: withoutTrailingSlash };
+    return { ok: true, origin: url.origin };
   }
 
   if (url.protocol === "http:" && isLoopbackHost(url.hostname)) {
-    return { ok: true, origin: withoutTrailingSlash };
+    return { ok: true, origin: url.origin };
   }
 
   return {
@@ -178,8 +208,13 @@ export function resolveCorsOrigin(requestOrigin: string | undefined): string | n
     return allowed[0] ?? null;
   }
 
-  if (allowed.includes(requestOrigin)) {
-    return requestOrigin;
+  const requestUrl = parseOriginLike(requestOrigin);
+  if (!requestUrl) {
+    return null;
+  }
+
+  if (allowed.includes(requestUrl.origin)) {
+    return requestUrl.origin;
   }
 
   return null;
