@@ -1,13 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getExtensionChangelog, getMe, signIn, signUp, verifyEmail } from "./api";
 import { AuthApiError } from "./authErrors";
-import { getApiBaseUrlForAuth, isAuthApiBaseMissing } from "./apiBase";
+import {
+  getApiBaseUrlForAuth,
+  getBuildTimeOnlyApiBaseUrlForAuth,
+  isAuthApiBaseMissing,
+} from "./apiBase";
 
 vi.mock("./apiBase", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./apiBase")>();
   return {
     ...actual,
     getApiBaseUrlForAuth: vi.fn(actual.getApiBaseUrlForAuth),
+    getBuildTimeOnlyApiBaseUrlForAuth: vi.fn(actual.getBuildTimeOnlyApiBaseUrlForAuth),
     isAuthApiBaseMissing: vi.fn(actual.isAuthApiBaseMissing),
   };
 });
@@ -16,6 +21,9 @@ describe("api auth", () => {
   beforeEach(() => {
     vi.mocked(isAuthApiBaseMissing).mockReturnValue(false);
     vi.mocked(getApiBaseUrlForAuth).mockReturnValue("https://api.example.com");
+    vi.mocked(getBuildTimeOnlyApiBaseUrlForAuth).mockReturnValue(
+      "https://build.example.com"
+    );
   });
 
   afterEach(() => {
@@ -56,7 +64,7 @@ describe("api auth", () => {
     );
   });
 
-  it("getMe uses the resolved API base", async () => {
+  it("getMe uses the validated build-time API base, not runtime overrides", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({ id: "1", email: "user@example.com" }),
@@ -64,9 +72,11 @@ describe("api auth", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     await getMe("jwt");
-    expect(fetchMock).toHaveBeenCalledWith("https://api.example.com/auth/me", {
+    expect(fetchMock).toHaveBeenCalledWith("https://build.example.com/auth/me", {
       headers: { Authorization: "Bearer jwt" },
     });
+    expect(getBuildTimeOnlyApiBaseUrlForAuth).toHaveBeenCalled();
+    expect(getApiBaseUrlForAuth).not.toHaveBeenCalled();
   });
 
   it("signIn maps 401 responses to invalid credentials", async () => {

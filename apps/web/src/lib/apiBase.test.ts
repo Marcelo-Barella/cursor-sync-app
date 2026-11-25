@@ -5,6 +5,7 @@ import {
   normalizeApiBaseUrl,
   readQueryApiOverride,
   resolveApiBaseUrl,
+  resolveBuildTimeOnlyApiBaseUrl,
   setStoredApiOverride,
 } from "./apiBase";
 import { DEFAULT_LOCAL_API_BASE_URL } from "./defaults";
@@ -118,6 +119,17 @@ describe("resolveApiBaseUrl", () => {
         buildTimeUrl: "http://localhost:8100",
       })
     ).toBe("https://stored.example.com");
+  });
+
+  it("resolveBuildTimeOnlyApiBaseUrl ignores localStorage and query overrides", () => {
+    const storage = createMemoryStorage();
+    storage.setItem(API_BASE_STORAGE_KEY, "https://stored.example.com");
+    expect(
+      resolveBuildTimeOnlyApiBaseUrl({
+        buildTimeUrl: "https://build.example.com",
+        mode: "staging",
+      })
+    ).toBe("https://build.example.com");
   });
 
   it("saves a valid ?api= override to storage and uses it", () => {
