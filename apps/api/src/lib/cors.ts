@@ -58,10 +58,54 @@ export function isCorsAllowlistConfigured(): boolean {
   return Boolean(process.env.CORS_ALLOWED_ORIGINS?.trim());
 }
 
+function isLoopbackHost(hostname: string): boolean {
+  if (hostname === "localhost" || hostname === "[::1]") {
+    return true;
+  }
+  if (hostname === "127.0.0.1") {
+    return true;
+  }
+  return /^127(?:\.\d{1,3}){3}$/.test(hostname);
+}
+
+export function findInsecureHttpCorsOriginsInProduction(
+  env: NodeJS.ProcessEnv = process.env
+): string[] {
+  if (env.NODE_ENV !== "production") {
+    return [];
+  }
+  const raw = env.CORS_ALLOWED_ORIGINS?.trim();
+  if (!raw) {
+    return [];
+  }
+  const insecure: string[] = [];
+  for (const entry of raw.split(",")) {
+    const origin = entry.trim();
+    if (!origin) {
+      continue;
+    }
+    try {
+      const url = new URL(origin);
+      if (url.protocol === "http:" && !isLoopbackHost(url.hostname)) {
+        insecure.push(origin);
+      }
+    } catch {
+      continue;
+    }
+  }
+  return insecure;
+}
+
 export function logCorsStartup(): void {
   if (!isCorsAllowlistConfigured()) {
     console.error(
       "CORS_ALLOWED_ORIGINS is unset or empty: cross-origin browser access is denied (fail closed)"
+    );
+  }
+  const insecure = findInsecureHttpCorsOriginsInProduction();
+  if (insecure.length > 0) {
+    console.error(
+      `CORS_ALLOWED_ORIGINS in production includes non-HTTPS origins (non-loopback): ${insecure.join(", ")}`
     );
   }
 }

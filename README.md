@@ -36,6 +36,7 @@ db/
 ```bash
 cp .env.example .env
 # Set JWT_SECRET in .env to a long random string (required — API refuses to start without it)
+# .env.example sets CORS_ALLOWED_ORIGINS=http://localhost:3000 for the local website → API cross-origin API calls
 
 docker compose up --build
 ```
@@ -43,12 +44,14 @@ docker compose up --build
 - Website: **http://localhost:3000**
 - API: **http://localhost:8100**
 
+On deployed hosts, set `CORS_ALLOWED_ORIGINS` to your public `https://` website origin (not localhost).
+
 ### Website only (Vite dev server)
 
 With the API running (compose or `npm run dev:api`):
 
 ```bash
-cp .env.example .env   # includes VITE_API_URL=http://localhost:8100 for the website
+cp .env.example .env   # VITE_API_URL=http://localhost:8100 and CORS_ALLOWED_ORIGINS=http://localhost:3000
 npm install
 npm run dev:web
 ```

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
 import {
+  findInsecureHttpCorsOriginsInProduction,
   isCorsAllowlistConfigured,
   logCorsStartup,
   originMatchesAllowedPattern,
@@ -40,6 +41,52 @@ test("treats empty allowlist env as unset", () => {
   process.env.CORS_ALLOWED_ORIGINS = "   ";
   assert.equal(resolveCorsOrigin("https://staging.cursor-sync.com"), null);
   assert.equal(isCorsAllowlistConfigured(), false);
+});
+
+test("findInsecureHttpCorsOriginsInProduction flags http non-loopback in production", () => {
+  assert.deepEqual(
+    findInsecureHttpCorsOriginsInProduction({
+      NODE_ENV: "production",
+      CORS_ALLOWED_ORIGINS:
+        "https://staging.cursor-sync.com,http://insecure.example",
+    }),
+    ["http://insecure.example"]
+  );
+  assert.deepEqual(
+    findInsecureHttpCorsOriginsInProduction({
+      NODE_ENV: "production",
+      CORS_ALLOWED_ORIGINS: "http://localhost:3000,https://ok.example",
+    }),
+    []
+  );
+  assert.deepEqual(
+    findInsecureHttpCorsOriginsInProduction({
+      NODE_ENV: "development",
+      CORS_ALLOWED_ORIGINS: "http://insecure.example",
+    }),
+    []
+  );
+});
+
+test("logCorsStartup errors on insecure http origins in production", () => {
+  const errors: string[] = [];
+  const originalError = console.error;
+  const originalEnv = process.env;
+  console.error = (message?: unknown) => {
+    errors.push(String(message));
+  };
+  try {
+    process.env = {
+      ...originalEnv,
+      NODE_ENV: "production",
+      CORS_ALLOWED_ORIGINS: "http://evil.example",
+    };
+    logCorsStartup();
+    assert.ok(errors.some((line) => /non-HTTPS origins/i.test(line)));
+  } finally {
+    process.env = originalEnv;
+    console.error = originalError;
+  }
 });
 
 test("logCorsStartup errors once when allowlist unset", () => {
